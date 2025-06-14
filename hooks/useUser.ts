@@ -10,4 +10,4 @@ export function useUser(userId: string | undefined, initialData?: User) {
     initialData: initialData ? { success: true, data: initialData } : undefined,
     select: (data) => data?.data ?? null,
   })
-} 
+}

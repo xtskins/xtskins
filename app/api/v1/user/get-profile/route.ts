@@ -16,12 +16,12 @@ export async function GET(req: Request): Promise<Response> {
             code: 'VALIDATION_ERROR',
           },
         }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
+        { status: 400, headers: { 'Content-Type': 'application/json' } },
       )
     }
 
     const supabase = createServerSupabaseClient(accessToken)
-    
+
     const { data, error } = await supabase
       .from('users')
       .select('*')
@@ -38,22 +38,21 @@ export async function GET(req: Request): Promise<Response> {
             code: 'USER_NOT_FOUND',
           },
         }),
-        { status: 404, headers: { 'Content-Type': 'application/json' } }
+        { status: 404, headers: { 'Content-Type': 'application/json' } },
       )
     }
 
     const validatedUser = userSchema.parse(data)
-    
-    const result: ApiResponse<User> = { 
-      success: true, 
-      data: validatedUser 
+
+    const result: ApiResponse<User> = {
+      success: true,
+      data: validatedUser,
     }
 
     return new Response(JSON.stringify(result), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     })
-
   } catch (error) {
     console.error('Erro interno:', error)
     return new Response(
@@ -67,7 +66,7 @@ export async function GET(req: Request): Promise<Response> {
       {
         status: 500,
         headers: { 'Content-Type': 'application/json' },
-      }
+      },
     )
   }
-} 
+}

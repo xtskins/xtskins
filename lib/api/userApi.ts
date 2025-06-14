@@ -21,8 +21,9 @@ export const userApi = {
     })
 
     const data = await response.json()
-    if (!data.success) throw new Error(data.error?.message || 'Falha ao buscar perfil')
+    if (!data.success)
+      throw new Error(data.error?.message || 'Falha ao buscar perfil')
 
     return data
   },
-} 
+}

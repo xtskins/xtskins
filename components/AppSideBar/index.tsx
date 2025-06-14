@@ -1,173 +1,127 @@
-"use client"
+'use client'
 
-import * as React from "react"
+import * as React from 'react'
 import {
-  AudioWaveform,
   BookOpen,
   Bot,
-  Command,
   Frame,
-  GalleryVerticalEnd,
   Map,
   PieChart,
   Settings2,
   SquareTerminal,
-} from "lucide-react"
+} from 'lucide-react'
 
-import { NavMain } from "@/components/NavMain"
-import { NavProjects } from "@/components/NavProjects"
-import { NavUser } from "@/components/NavUser"
-import { TeamSwitcher } from "@/components/TeamSwitcher"
+import { NavMain } from '@/components/NavMain'
+import { NavProjects } from '@/components/NavProjects'
+import { NavUser } from '@/components/NavUser'
+import { TeamSwitcher } from '@/components/TeamSwitcher'
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarHeader,
   SidebarRail,
-} from "@/components/ui/sidebar"
+} from '@/components/ui/sidebar'
+import { User } from '@/lib/types/user'
+import { SkinType, Skin } from '@/lib/types/skin'
+import { User as SupabaseUser } from '@supabase/supabase-js'
+import { useAuth } from '@/context/AuthContext'
+import { LoginButton } from '@/components/LoginButton'
 
-// This is sample data.
+interface ServerUserData {
+  user: SupabaseUser | null
+  profile: User | null
+  skinTypes: SkinType[]
+  skins: Skin[]
+}
+
+interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
+  serverUserData?: ServerUserData
+}
+
+// Mapeia ícones para diferentes tipos de skin
+const getIconForType = (type: string) => {
+  switch (type.toLowerCase()) {
+    case 'rifle':
+      return SquareTerminal
+    case 'machinegun':
+      return Bot
+    case 'pistol':
+      return BookOpen
+    case 'smg':
+      return Settings2
+    default:
+      return Frame
+  }
+}
+
+const createNavMainFromSkinTypes = (skinTypes: SkinType[]) => {
+  return skinTypes.map((skinType) => ({
+    title: skinType.type,
+    url: '#',
+    icon: getIconForType(skinType.type),
+    isActive: false,
+    items: skinType.sub_types.map((subType) => ({
+      title: subType,
+      url: '#',
+    })),
+  }))
+}
+
 const data = {
   user: {
-    name: "shadcn",
-    email: "m@example.com",
-    avatar: "/avatars/shadcn.jpg",
+    name: 'shadcn',
+    email: 'm@example.com',
+    avatar: '/avatars/shadcn.jpg',
   },
-  teams: [
-    {
-      name: "Acme Inc",
-      logo: GalleryVerticalEnd,
-      plan: "Enterprise",
-    },
-    {
-      name: "Acme Corp.",
-      logo: AudioWaveform,
-      plan: "Startup",
-    },
-    {
-      name: "Evil Corp.",
-      logo: Command,
-      plan: "Free",
-    },
-  ],
-  navMain: [
-    {
-      title: "Playground",
-      url: "#",
-      icon: SquareTerminal,
-      isActive: true,
-      items: [
-        {
-          title: "History",
-          url: "#",
-        },
-        {
-          title: "Starred",
-          url: "#",
-        },
-        {
-          title: "Settings",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Models",
-      url: "#",
-      icon: Bot,
-      items: [
-        {
-          title: "Genesis",
-          url: "#",
-        },
-        {
-          title: "Explorer",
-          url: "#",
-        },
-        {
-          title: "Quantum",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Documentation",
-      url: "#",
-      icon: BookOpen,
-      items: [
-        {
-          title: "Introduction",
-          url: "#",
-        },
-        {
-          title: "Get Started",
-          url: "#",
-        },
-        {
-          title: "Tutorials",
-          url: "#",
-        },
-        {
-          title: "Changelog",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Settings",
-      url: "#",
-      icon: Settings2,
-      items: [
-        {
-          title: "General",
-          url: "#",
-        },
-        {
-          title: "Team",
-          url: "#",
-        },
-        {
-          title: "Billing",
-          url: "#",
-        },
-        {
-          title: "Limits",
-          url: "#",
-        },
-      ],
-    },
-  ],
   projects: [
     {
-      name: "Design Engineering",
-      url: "#",
+      name: 'Design Engineering',
+      url: '#',
       icon: Frame,
     },
     {
-      name: "Sales & Marketing",
-      url: "#",
+      name: 'Sales & Marketing',
+      url: '#',
       icon: PieChart,
     },
     {
-      name: "Travel",
-      url: "#",
+      name: 'Travel',
+      url: '#',
       icon: Map,
     },
   ],
 }
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+export function AppSidebar({ serverUserData, ...props }: AppSidebarProps) {
+  const { profile } = useAuth()
+
+  const currentProfile = profile || serverUserData?.profile
+  const skinTypes = serverUserData?.skinTypes || []
+  const navMain = createNavMainFromSkinTypes(skinTypes)
+
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
-        <TeamSwitcher teams={data.teams} />
+        <TeamSwitcher />
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
+        <NavMain items={navMain} />
         <NavProjects projects={data.projects} />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={data.user} />
+        {currentProfile ? (
+          <NavUser
+            user={{
+              name: currentProfile.name,
+              email: currentProfile.email,
+              avatar_url: currentProfile.avatar_url,
+            }}
+            loading={false}
+          />
+        ) : (
+          <LoginButton />
+        )}
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>
