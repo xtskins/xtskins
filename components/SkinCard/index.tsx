@@ -20,7 +20,6 @@ import Image from 'next/image'
 import { useState } from 'react'
 import { useTheme } from 'next-themes'
 
-// Interface para os dados da skin baseada na API
 interface SkinData {
   id: string
   marketname: string
@@ -57,7 +56,6 @@ export default function SkinCard({ skinData }: SkinCardProps) {
     setInCart(!inCart)
   }
 
-  // Converte preços para números
   const priceInReais = parseFloat(skinData.price)
   const discountPrice = parseFloat(skinData.discount_price)
 

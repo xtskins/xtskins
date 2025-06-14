@@ -20,8 +20,12 @@ export async function getAuthenticatedUser() {
               cookiesToSet.forEach(({ name, value, options }) =>
                 cookieStore.set(name, value, options),
               )
-            } catch {
-              // SSR-friendly: não fazer nada se falhar
+            } catch (error) {
+              // SSR-friendly: não fazer nada se falhar durante build/static generation
+              console.warn(
+                'Falha ao definir cookies durante renderização estática:',
+                error,
+              )
             }
           },
         },

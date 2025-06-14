@@ -1,8 +1,11 @@
 import SkinCard from '@/components/SkinCard'
-import { getAllSkinsServerData } from '@/lib/server/data/skins/getSkinsServerData'
+import { getCachedSkins } from '@/lib/server/cache/skins-cache'
+
+// Herda a configuração dinâmica do layout, mas pode ser explícito se necessário
+// export const dynamic = 'force-dynamic'
 
 export default async function Page() {
-  const { skins } = await getAllSkinsServerData()
+  const { skins } = await getCachedSkins()
 
   if (!skins || skins.length === 0) {
     return (
