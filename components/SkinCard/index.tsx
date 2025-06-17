@@ -17,43 +17,23 @@ import {
 import { Button } from '@/components/ui/button'
 import { motion } from 'framer-motion'
 import Image from 'next/image'
-import { useState } from 'react'
-import { useTheme } from 'next-themes'
-
-interface SkinData {
-  id: string
-  marketname: string
-  price: string
-  discount_price: string
-  discount: number
-  image: string
-  rarity: string
-  color: string
-  wear: string
-  float_value: number | null
-  stickers: Array<{
-    name: string
-    image: string
-  }>
-  charms: Array<{
-    name: string
-    image: string
-  }>
-  inspectlink: string
-  tradable: boolean
-  is_visible: boolean
-}
+import { useOrder } from '@/context/OrderContext'
+import { Skin } from '@/lib/types/skin'
 
 interface SkinCardProps {
-  skinData: SkinData
+  skinData: Skin
 }
 
 export default function SkinCard({ skinData }: SkinCardProps) {
-  const [inCart, setInCart] = useState(false)
-  const { theme } = useTheme()
+  const { addToCart, removeFromCart, isInCart } = useOrder()
+  const inCart = isInCart(skinData.id)
 
   const handleCartAction = () => {
-    setInCart(!inCart)
+    if (inCart) {
+      removeFromCart(skinData.id)
+    } else {
+      addToCart(skinData)
+    }
   }
 
   const priceInReais = parseFloat(skinData.price)
@@ -62,7 +42,7 @@ export default function SkinCard({ skinData }: SkinCardProps) {
   return (
     <div className="flex justify-center">
       <div
-        className={`group relative mx-auto flex h-[575px] max-w-[300px] flex-col justify-between rounded-lg bg-white pt-4 drop-shadow-2xl hover:shadow-2xl hover:duration-500 dark:bg-[#141414] lg:h-[550px] lg:w-[265px] ${
+        className={`group relative mx-auto flex h-[575px] max-w-[300px] flex-col justify-between rounded-lg bg-white pt-4 drop-shadow-2xl hover:shadow-2xl hover:duration-500 dark:bg-[#232323] lg:h-[550px] lg:w-[265px] dark:border dark:border-[#343434] ${
           !skinData.is_visible ? 'hidden' : ''
         }`}
       >
@@ -77,20 +57,27 @@ export default function SkinCard({ skinData }: SkinCardProps) {
             <span>Bloqueado</span>
           </div>
         )}
-        <Tooltip>
-          <TooltipTrigger>
-            {skinData.discount < 0 && (
+        {skinData.discount < 0 && (
+          <Tooltip>
+            <TooltipTrigger asChild>
               <Info className="absolute right-0 z-20 mr-4" />
-            )}
-            {skinData.discount > 24 && (
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Overpay</p>
+            </TooltipContent>
+          </Tooltip>
+        )}
+
+        {skinData.discount > 24 && (
+          <Tooltip>
+            <TooltipTrigger asChild>
               <BadgePercent className="absolute right-0 z-20 mr-4" />
-            )}
-          </TooltipTrigger>
-          <TooltipContent>
-            {skinData.discount < 0 && <p>Overpay</p>}
-            {skinData.discount > 24 && <p>Desconto especial</p>}
-          </TooltipContent>
-        </Tooltip>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Desconto especial</p>
+            </TooltipContent>
+          </Tooltip>
+        )}
         <div className="flex flex-col items-center">
           <Image
             src={skinData.image}
@@ -133,9 +120,9 @@ export default function SkinCard({ skinData }: SkinCardProps) {
                           <Image
                             src={sticker.image}
                             alt={sticker.name}
-                            width={48}
-                            height={48}
-                            className="h-12 w-12 lg:h-[42px] lg:w-[42px] object-cover rounded-full"
+                            width={34}
+                            height={34}
+                            className="h-8 w-8 object-cover rounded-full"
                           />
                         </div>
                       </TooltipTrigger>
@@ -175,7 +162,9 @@ export default function SkinCard({ skinData }: SkinCardProps) {
             <div className="flex items-center justify-center">
               <span
                 className="text-xs font-semibold capitalize"
-                style={{ color: `#${skinData.color}` }}
+                style={{
+                  color: skinData.color ? `#${skinData.color}` : undefined,
+                }}
               >
                 {skinData.rarity}
               </span>
@@ -249,16 +238,16 @@ export default function SkinCard({ skinData }: SkinCardProps) {
           <motion.div
             initial={false}
             animate={{
-              backgroundColor: inCart
-                ? 'rgb(186, 44, 41)'
-                : theme === 'light'
-                  ? '#18181B'
-                  : 'rgb(250, 250, 250)',
+              backgroundColor: inCart ? 'rgb(220, 38, 38)' : 'rgb(17, 94, 209)',
+            }}
+            transition={{
+              duration: 0.4,
+              ease: 'easeInOut',
             }}
             className="mt-4 rounded-md"
           >
             <Button
-              className="flex w-full items-center justify-center gap-2 bg-transparent hover:bg-transparent"
+              className="flex w-full items-center justify-center gap-2 bg-transparent hover:bg-transparent cursor-pointer text-white"
               onClick={handleCartAction}
             >
               {inCart ? (

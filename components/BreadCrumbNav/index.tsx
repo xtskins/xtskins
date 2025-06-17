@@ -13,21 +13,22 @@ import {
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb'
 import { getBreadcrumbsForPath, routes } from '@/lib/config/routes'
+import { useFilter } from '@/context/FilterContext'
+import { Button } from '@/components/ui/button'
+import { X } from 'lucide-react'
 
 export function BreadcrumbNav() {
   const pathname = usePathname()
   const router = useRouter()
+  const { activeFilterText, clearFilters } = useFilter()
   const breadcrumbs = getBreadcrumbsForPath(pathname)
 
-  // Função para prefetch das rotas filhas
   const prefetchChildRoutes = React.useCallback(
     (parentKey: string) => {
-      // Encontra todas as rotas que têm este item como parent
       const childRoutes = Object.values(routes).filter(
         (route) => route.parent === parentKey,
       )
 
-      // Prefetch cada rota filha
       childRoutes.forEach((route) => {
         router.prefetch(route.path)
       })
@@ -47,7 +48,7 @@ export function BreadcrumbNav() {
           return (
             <React.Fragment key={crumb.path}>
               <BreadcrumbItem className="hidden md:block">
-                {isLast ? (
+                {isLast && !activeFilterText ? (
                   <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
                 ) : (
                   <div
@@ -65,10 +66,29 @@ export function BreadcrumbNav() {
                   </div>
                 )}
               </BreadcrumbItem>
-              {!isLast && <BreadcrumbSeparator className="hidden md:block" />}
+              {(!isLast || activeFilterText) && (
+                <BreadcrumbSeparator className="hidden md:block" />
+              )}
             </React.Fragment>
           )
         })}
+
+        {activeFilterText && (
+          <BreadcrumbItem className="hidden md:block">
+            <div className="flex items-center gap-2">
+              <BreadcrumbPage>{activeFilterText}</BreadcrumbPage>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearFilters}
+                className="h-4 w-4 p-0 hover:bg-transparent opacity-70 hover:opacity-100"
+                title="Limpar filtro"
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
+          </BreadcrumbItem>
+        )}
       </BreadcrumbList>
     </Breadcrumb>
   )

@@ -1,15 +1,8 @@
 'use client'
 
 import * as React from 'react'
-import {
-  BookOpen,
-  Bot,
-  Frame,
-  Map,
-  PieChart,
-  Settings2,
-  SquareTerminal,
-} from 'lucide-react'
+import { Frame, Instagram } from 'lucide-react'
+import { AK47Icon } from '@/components/icons/AK47Icon'
 
 import { NavMain } from '@/components/NavMain'
 import { NavProjects } from '@/components/NavProjects'
@@ -27,6 +20,13 @@ import { SkinType, Skin } from '@/lib/types/skin'
 import { User as SupabaseUser } from '@supabase/supabase-js'
 import { useAuth } from '@/context/AuthContext'
 import { LoginButton } from '@/components/LoginButton'
+import { useFilter } from '@/context/FilterContext'
+import { WhatsappIcon } from '../icons/WhatsappIcon'
+import AdminArea from '../AdminButton'
+import { USPIcon } from '../icons/USPIcon'
+import { MP9Icon } from '../icons/MP9Icon'
+import { AWPIcon } from '../icons/AWPIcon'
+import { MachineIcon } from '../icons/MachineIcon'
 
 interface ServerUserData {
   user: SupabaseUser | null
@@ -43,19 +43,22 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 const getIconForType = (type: string) => {
   switch (type.toLowerCase()) {
     case 'rifle':
-      return SquareTerminal
+      return AK47Icon
     case 'machinegun':
-      return Bot
+      return MachineIcon
     case 'pistol':
-      return BookOpen
+      return USPIcon
     case 'smg':
-      return Settings2
+      return MP9Icon
+    case 'sniper rifle':
+      return AWPIcon
     default:
       return Frame
   }
 }
 
 const createNavMainFromSkinTypes = (skinTypes: SkinType[]) => {
+  console.log(`skinTypes`, skinTypes)
   return skinTypes.map((skinType) => ({
     title: skinType.type,
     url: '#',
@@ -76,29 +79,33 @@ const data = {
   },
   projects: [
     {
-      name: 'Design Engineering',
-      url: '#',
-      icon: Frame,
+      name: 'WhatsApp',
+      url: 'https://wa.link/8doymn',
+      icon: WhatsappIcon,
+      target: '_blank',
     },
     {
-      name: 'Sales & Marketing',
-      url: '#',
-      icon: PieChart,
-    },
-    {
-      name: 'Travel',
-      url: '#',
-      icon: Map,
+      name: 'Instagram',
+      url: 'https://www.instagram.com/xtskins/',
+      icon: Instagram,
+      target: '_blank',
     },
   ],
 }
 
 export function AppSidebar({ serverUserData, ...props }: AppSidebarProps) {
   const { profile } = useAuth()
+  const { setFilter, filterState, clearFilters } = useFilter()
 
   const currentProfile = profile || serverUserData?.profile
   const skinTypes = serverUserData?.skinTypes || []
   const navMain = createNavMainFromSkinTypes(skinTypes)
+
+  const handleSubItemClick = (type: string, subType: string) => {
+    setFilter(type, subType)
+  }
+
+  console.log(currentProfile)
 
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -106,10 +113,18 @@ export function AppSidebar({ serverUserData, ...props }: AppSidebarProps) {
         <TeamSwitcher />
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={navMain} />
+        <NavMain
+          items={navMain}
+          onSubItemClick={handleSubItemClick}
+          onClearFilters={clearFilters}
+          activeSubType={filterState.selectedSubType}
+        />
         <NavProjects projects={data.projects} />
       </SidebarContent>
       <SidebarFooter>
+        {currentProfile?.role === 'admin' && (
+          <AdminArea isSteamIdConfirmed={!!currentProfile?.steam_id} />
+        )}
         {currentProfile ? (
           <NavUser
             user={{

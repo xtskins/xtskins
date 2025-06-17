@@ -12,6 +12,7 @@ create table public.users (
   avatar_url text,                                       -- URL da foto de perfil
   role user_role default 'client',                       -- Role do usuário (client por padrão, admin para administradores)
   level text default 'Bronze',                           -- Nível do usuário (Bronze por padrão)
+  steam_id text,                                         -- Steam ID do usuário (usado apenas para admins, pode ser nulo)
   created_at timestamp with time zone default now()      -- Data de criação do registro
 ); 
 

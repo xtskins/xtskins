@@ -26,4 +26,23 @@ export const userApi = {
 
     return data
   },
+
+  async updateSteamId(steamId: string): Promise<ApiResponse<null>> {
+    const accessToken = await getAccessToken()
+
+    const response = await fetch('/api/v1/user/update-steam-id', {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ steamId }),
+    })
+
+    const data = await response.json()
+    if (!data.success)
+      throw new Error(data.error?.message || 'Falha ao atualizar Steam ID')
+
+    return data
+  },
 }

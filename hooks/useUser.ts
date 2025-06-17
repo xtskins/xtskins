@@ -9,5 +9,7 @@ export function useUser(userId: string | undefined, initialData?: User) {
     enabled: !!userId && !initialData,
     initialData: initialData ? { success: true, data: initialData } : undefined,
     select: (data) => data?.data ?? null,
+    staleTime: 1000 * 60 * 5,
+    gcTime: 1000 * 60 * 10,
   })
 }

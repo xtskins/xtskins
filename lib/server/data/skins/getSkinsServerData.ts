@@ -22,7 +22,13 @@ export async function getSkinsServerData() {
     const typeMap = new Map<string, Set<string>>()
 
     data.forEach((skin) => {
-      if (skin.type && skin.sub_type) {
+      // Verifica se type e sub_type não são null e não são strings vazias
+      if (
+        skin.type &&
+        skin.sub_type &&
+        skin.type.trim() &&
+        skin.sub_type.trim()
+      ) {
         if (!typeMap.has(skin.type)) {
           typeMap.set(skin.type, new Set())
         }
@@ -68,7 +74,21 @@ export async function getAllSkinsServerData() {
       return { skins: [] }
     }
 
-    const validatedSkins: Skin[] = data.map((skin) => skinSchema.parse(skin))
+    const validatedSkins: Skin[] = []
+
+    for (const skin of data) {
+      try {
+        const validatedSkin = skinSchema.parse(skin)
+        validatedSkins.push(validatedSkin)
+      } catch (error) {
+        console.error('Erro ao validar skin:', {
+          assetid: skin.assetid,
+          markethashname: skin.markethashname,
+          error: error instanceof Error ? error.message : error,
+        })
+        // Continua sem esta skin
+      }
+    }
 
     return { skins: validatedSkins }
   } catch (error) {

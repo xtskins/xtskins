@@ -1,12 +1,19 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState, useMemo } from 'react'
 import { User as SupabaseUser } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { User } from '@/lib/types/user'
 import { useUser } from '@/hooks/useUser'
-import { useServerData } from '@/context/ServerDataContext'
+import { Skin, SkinType } from '@/lib/types/skin'
+
+interface ServerUserData {
+  user: SupabaseUser | null
+  profile: User | null
+  skinTypes: SkinType[]
+  skins: Skin[]
+}
 
 type AuthContextType = {
   user: SupabaseUser | null
@@ -18,14 +25,24 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+interface AuthProviderProps {
+  children: React.ReactNode
+  serverData: ServerUserData
+}
+
+export function AuthProvider({ children, serverData }: AuthProviderProps) {
   const [user, setUser] = useState<SupabaseUser | null>(null)
   const [loading, setLoading] = useState(true)
   const supabase = createClient()
   const router = useRouter()
 
-  const serverData = useServerData()
-  const { data: profile } = useUser(user?.id, serverData?.profile || undefined)
+  const currentUser = serverData?.user || user
+
+  const initialProfile = useMemo(() => {
+    return serverData?.profile || undefined
+  }, [serverData?.profile])
+
+  const { data: profile } = useUser(currentUser?.id, initialProfile)
 
   useEffect(() => {
     if (serverData?.user) {
@@ -60,7 +77,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const value = {
-    user,
+    user: currentUser,
     profile: profile ?? null,
     loading,
     signInWithGoogle,

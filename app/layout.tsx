@@ -4,12 +4,15 @@ import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { ThemeProvider } from 'next-themes'
 import { AuthProvider } from '@/context/AuthContext'
+import { OrderProvider } from '@/context/OrderContext'
 import './globals.css'
 import { TanstackProvider } from './providers'
 import { ServerDataProvider } from '@/context/ServerDataContext'
+import { FilterWrapper } from '@/components/FilterWrapper'
 
 import { AppSidebar } from '@/components/AppSideBar'
 import { BreadcrumbNav } from '@/components/BreadCrumbNav'
+import { CartButton } from '@/components/CartButton'
 import { ThemeToggle } from '@/components/Theme'
 import { Separator } from '@/components/ui/separator'
 import {
@@ -19,6 +22,7 @@ import {
 } from '@/components/ui/sidebar'
 import { getUserServerData } from '@/lib/server/data/user/getUserServerData'
 import { getCachedSkins } from '@/lib/server/cache/skins-cache'
+import { getSidebarState } from '@/lib/utils/cookies'
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -42,9 +46,10 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  const [userData, skinsData] = await Promise.all([
+  const [userData, skinsData, sidebarOpen] = await Promise.all([
     getUserServerData(),
     getCachedSkins(),
+    getSidebarState(),
   ])
 
   const serverData = {
@@ -60,29 +65,37 @@ export default async function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <TanstackProvider>
-          <ThemeProvider attribute="class" defaultTheme="light">
-            <AuthProvider>
-              <ServerDataProvider data={serverData}>
-                <SidebarProvider key="sidebar-provider">
-                  <AppSidebar serverUserData={serverData} />
-                  <SidebarInset>
-                    <header className="flex h-16 shrink-0 items-center justify-between gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
-                      <div className="flex items-center gap-2 px-4">
-                        <SidebarTrigger className="-ml-1" />
-                        <Separator
-                          orientation="vertical"
-                          className="mr-2 h-4"
-                        />
-                        <BreadcrumbNav />
-                      </div>
-                      <div className="flex items-center gap-2 px-4">
-                        <ThemeToggle />
-                      </div>
-                    </header>
-                    {children}
-                  </SidebarInset>
-                </SidebarProvider>
-              </ServerDataProvider>
+          <ThemeProvider attribute="class" defaultTheme="dark">
+            <AuthProvider serverData={serverData}>
+              <OrderProvider>
+                <ServerDataProvider data={serverData}>
+                  <FilterWrapper skins={serverData.skins}>
+                    <SidebarProvider
+                      key="sidebar-provider"
+                      defaultOpen={sidebarOpen}
+                    >
+                      <AppSidebar serverUserData={serverData} />
+                      <SidebarInset>
+                        <header className="flex h-16 shrink-0 items-center justify-between gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
+                          <div className="flex items-center gap-2 px-4">
+                            <SidebarTrigger className="-ml-1" />
+                            <Separator
+                              orientation="vertical"
+                              className="mr-2 h-4"
+                            />
+                            <BreadcrumbNav />
+                          </div>
+                          <div className="flex items-center gap-2 px-4">
+                            <CartButton />
+                            <ThemeToggle />
+                          </div>
+                        </header>
+                        {children}
+                      </SidebarInset>
+                    </SidebarProvider>
+                  </FilterWrapper>
+                </ServerDataProvider>
+              </OrderProvider>
             </AuthProvider>
           </ThemeProvider>
         </TanstackProvider>

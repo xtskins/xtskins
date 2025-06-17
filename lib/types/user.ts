@@ -6,6 +6,9 @@ export const userSchema = z.object({
   name: z.string(),
   full_name: z.string(),
   avatar_url: z.string().url(),
+  role: z.enum(['admin', 'client']),
+  level: z.string(),
+  steam_id: z.string().nullable(),
   created_at: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?([+-]\d{2}:\d{2}|Z)?$/)
