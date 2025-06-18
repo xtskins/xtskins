@@ -58,7 +58,6 @@ const getIconForType = (type: string) => {
 }
 
 const createNavMainFromSkinTypes = (skinTypes: SkinType[]) => {
-  console.log(`skinTypes`, skinTypes)
   return skinTypes.map((skinType) => ({
     title: skinType.type,
     url: '#',
@@ -104,8 +103,6 @@ export function AppSidebar({ serverUserData, ...props }: AppSidebarProps) {
   const handleSubItemClick = (type: string, subType: string) => {
     setFilter(type, subType)
   }
-
-  console.log(currentProfile)
 
   return (
     <Sidebar collapsible="icon" {...props}>

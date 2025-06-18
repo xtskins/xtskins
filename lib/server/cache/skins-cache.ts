@@ -3,6 +3,7 @@ import {
   getSkinsServerData,
 } from '../data/skins/getSkinsServerData'
 import { Skin, SkinType } from '@/lib/types/skin'
+import { revalidatePath } from 'next/cache'
 
 let skinsCache: {
   skins: Skin[]
@@ -15,7 +16,7 @@ let isUpdating = false
 let updatePromise: Promise<void> | null = null
 
 const CACHE_TTL =
-  process.env.NODE_ENV === 'development' ? 1 * 60 * 1000 : 5 * 60 * 1000 // 1 minuto
+  process.env.NODE_ENV === 'development' ? 1 * 60 * 1000 : 5 * 60 * 1000 // 5 minutos em produção
 
 export async function getCachedSkins(forceRefresh = false) {
   const now = Date.now()
@@ -107,6 +108,35 @@ export function invalidateSkinsCache() {
 }
 
 /**
+ * Invalida o cache das skins e revalida as páginas do Next.js
+ */
+export async function invalidateSkinsAndRevalidate() {
+  console.log('🔄 Invalidando cache e revalidando páginas...')
+
+  // Invalida o cache em memória
+  invalidateSkinsCache()
+
+  // Revalida as páginas do Next.js para forçar regeneração
+  try {
+    const pathsToRevalidate = [
+      '/', // página inicial
+      '/skins', // se houver uma página de skins específica
+    ]
+
+    for (const path of pathsToRevalidate) {
+      revalidatePath(path, 'page')
+      console.log(`✅ Página ${path} revalidada`)
+    }
+
+    // Também revalida o layout para garantir que os dados são atualizados
+    revalidatePath('/', 'layout')
+    console.log('✅ Layout revalidado')
+  } catch (error) {
+    console.error('❌ Erro ao revalidar páginas:', error)
+  }
+}
+
+/**
  * Força a atualização do cache das skins
  */
 export async function refreshSkinsCache() {
@@ -114,5 +144,40 @@ export async function refreshSkinsCache() {
   invalidateSkinsCache()
   const result = await getCachedSkins(true)
   console.log('✅ Cache refreshado com sucesso')
+  return result
+}
+
+/**
+ * Força a atualização do cache das skins e revalida as páginas
+ */
+export async function refreshSkinsAndRevalidate() {
+  console.log('🔄 Forçando refresh do cache das skins com revalidação...')
+
+  // Invalida o cache atual
+  invalidateSkinsCache()
+
+  // Busca novos dados
+  const result = await getCachedSkins(true)
+
+  // Revalida as páginas
+  try {
+    const pathsToRevalidate = [
+      '/', // página inicial
+      '/skins', // se houver uma página de skins específica
+    ]
+
+    for (const path of pathsToRevalidate) {
+      revalidatePath(path, 'page')
+      console.log(`✅ Página ${path} revalidada`)
+    }
+
+    // Também revalida o layout
+    revalidatePath('/', 'layout')
+    console.log('✅ Layout revalidado')
+  } catch (error) {
+    console.error('❌ Erro ao revalidar páginas:', error)
+  }
+
+  console.log('✅ Cache refreshado e páginas revalidadas com sucesso')
   return result
 }

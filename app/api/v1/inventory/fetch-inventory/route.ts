@@ -5,13 +5,8 @@ import {
   getExchangeRate,
 } from '@/lib/types/skin'
 import { SteamAuthService } from '@/lib/steam/steam-auth-service'
+import { invalidateSkinsAndRevalidate } from '@/lib/server/cache/skins-cache'
 import { z } from 'zod'
-
-interface SkinData {
-  assetid: string
-  markethashname: string
-  marketname: string
-}
 
 const STEAM_API_KEY = process.env.STEAM_API_KEY || 'NV0Z3WKMXLZN1X3Q'
 
@@ -102,15 +97,28 @@ export async function POST(req: Request): Promise<Response> {
     const steamId = userProfile.steam_id
 
     // Sempre obter um token fresco do SteamAuthService
-    console.log('=== PROCESSO DE AUTENTICAÇÃO STEAM ===')
-    console.log('Steam ID do usuário:', steamId)
-    console.log('🔄 Obtendo steam_login_secure automaticamente...')
+    console.log(
+      '🔑 [STEAM_AUTH] Starting Steam authentication process for steamId:',
+      steamId,
+    )
 
     const steamAuth = SteamAuthService.getInstance()
+    console.log('🔑 [STEAM_AUTH] SteamAuthService instance obtained')
+
     const authResult = await steamAuth.getSteamLoginSecure(accessToken)
 
+    console.log('🔑 [STEAM_AUTH] Authentication result:', {
+      success: authResult.success,
+      hasToken: !!authResult.steamLoginSecure,
+      tokenPreview: authResult.steamLoginSecure,
+      error: authResult.error,
+    })
+
     if (!authResult.success) {
-      console.error('❌ Erro ao obter steam_login_secure:', authResult.error)
+      console.log(
+        '❌ [STEAM_AUTH] Steam authentication failed:',
+        authResult.error,
+      )
       return new Response(
         JSON.stringify({
           success: false,
@@ -125,14 +133,12 @@ export async function POST(req: Request): Promise<Response> {
     }
 
     const steamLoginSecure = authResult.steamLoginSecure!
-    console.log('✅ steam_login_secure obtido com sucesso!')
     console.log(
-      '🔑 Steam Login Secure (primeiros 30 caracteres):',
-      steamLoginSecure.substring(0, 30) + '...',
+      '🔑 [STEAM_AUTH] steamLoginSecure will be used in API:',
+      steamLoginSecure,
     )
 
     // Montar a URL da API externa
-    console.log('=== PREPARANDO REQUISIÇÃO PARA API DO STEAM ===')
     const steamApiUrl = new URL(
       'https://www.steamwebapi.com/steam/api/inventory',
     )
@@ -141,22 +147,7 @@ export async function POST(req: Request): Promise<Response> {
     steamApiUrl.searchParams.append('steam_login_secure', steamLoginSecure)
     steamApiUrl.searchParams.append('no_cache', '1')
 
-    console.log(
-      '🌐 URL da API Steam:',
-      steamApiUrl
-        .toString()
-        .replace(steamLoginSecure, steamLoginSecure.substring(0, 30) + '...'),
-    )
-    console.log('📋 Parâmetros da requisição:')
-    console.log('  - Steam ID:', steamId)
-    console.log('  - API Key:', STEAM_API_KEY.substring(0, 10) + '...')
-    console.log(
-      '  - Steam Login Secure (primeiros 30 chars):',
-      steamLoginSecure.substring(0, 30) + '...',
-    )
-
     // Fazer a requisição para a API externa
-    console.log('🚀 Enviando requisição para a API do Steam...')
     const steamResponse = await fetch(steamApiUrl.toString(), {
       method: 'GET',
       headers: {
@@ -165,19 +156,8 @@ export async function POST(req: Request): Promise<Response> {
       },
     })
 
-    console.log('📡 Resposta da API Steam:')
-    console.log('  - Status:', steamResponse.status)
-    console.log('  - Status Text:', steamResponse.statusText)
-    console.log(
-      '  - Headers:',
-      Object.fromEntries(steamResponse.headers.entries()),
-    )
-
     if (!steamResponse.ok) {
-      console.log('❌ Erro na requisição Steam:', steamResponse.status)
-      console.log('🔍 Detalhes da resposta de erro:')
       const errorText = await steamResponse.text()
-      console.log('Response body:', errorText)
 
       return new Response(
         JSON.stringify({
@@ -198,42 +178,8 @@ export async function POST(req: Request): Promise<Response> {
     }
 
     const steamData = await steamResponse.json()
-    console.log('=== RESPOSTA COMPLETA DA API EXTERNA ===')
-    console.log(
-      '📦 Total de itens recebidos:',
-      Array.isArray(steamData) ? steamData.length : 'Não é array',
-    )
-    console.log('🔍 Tipo de dados recebidos:', typeof steamData)
 
-    if (Array.isArray(steamData) && steamData.length > 0) {
-      console.log('🎮 Primeiras 5 skins recebidas:')
-      steamData.slice(0, 5).forEach((skin, index) => {
-        console.log(
-          `  ${index + 1}. ${skin.marketname || skin.markethashname || 'Nome não disponível'}`,
-        )
-        console.log(`     AssetID: ${skin.assetid}`)
-        console.log(`     Raridade: ${skin.rarity || 'N/A'}`)
-        console.log(`     Wear: ${skin.wear || 'N/A'}`)
-        console.log('     ---')
-      })
-
-      if (steamData.length > 5) {
-        console.log(`  ... e mais ${steamData.length - 5} skins`)
-      }
-    }
-
-    console.log(
-      '📄 Dados completos (JSON):',
-      JSON.stringify(steamData, null, 2),
-    )
-
-    return await processInventoryData(
-      steamData,
-      supabase,
-      userData,
-      steamId,
-      steamLoginSecure,
-    )
+    return await processInventoryData(steamData, supabase, userData, steamId)
   } catch (error) {
     console.error('Erro no endpoint de inventário:', error)
 
@@ -274,31 +220,7 @@ async function processInventoryData(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   userData: any,
   steamId: string,
-  steamLoginSecure: string,
 ): Promise<Response> {
-  console.log('=== INICIANDO PROCESSAMENTO DO INVENTÁRIO ===')
-  console.log('📈 Quantidade de skins recebidas da API:', steamData.length)
-  console.log('👤 Steam ID do usuário:', steamId)
-  console.log('🆔 User ID:', userData.user.id)
-
-  console.log('🎮 DETALHES DAS SKINS RECEBIDAS:')
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  steamData.forEach((skin: any, index: number) => {
-    console.log(`  ${index + 1}/${steamData.length}:`)
-    console.log(`    📦 AssetID: ${skin.assetid}`)
-    console.log(`    🏷️  Market Hash Name: ${skin.markethashname}`)
-    console.log(`    📋 Market Name: ${skin.marketname}`)
-    console.log(`    🌟 Raridade: ${skin.rarity || 'N/A'}`)
-    console.log(`    🔧 Desgaste: ${skin.wear || 'N/A'}`)
-    console.log(
-      `    💰 Preço 24h: ${skin.pricereal24h || skin.priceavg || skin.pricelatest || 'N/A'}`,
-    )
-    console.log(`    🔄 Tradável: ${skin.tradable ? 'SIM' : 'NÃO'}`)
-    console.log(`    🎨 Cor: ${skin.color || 'N/A'}`)
-    console.log(`    📊 Qualidade: ${skin.quality || 'N/A'}`)
-    console.log('    ---')
-  })
-
   // Verificar se a resposta tem o formato esperado (array de skins)
   if (!Array.isArray(steamData)) {
     return new Response(
@@ -317,38 +239,19 @@ async function processInventoryData(
   const validatedSkins = []
   const invalidSkins = []
 
-  console.log('=== INICIANDO VALIDAÇÃO DAS SKINS ===')
   for (let i = 0; i < steamData.length; i++) {
     const skin = steamData[i]
-    console.log(`Validando skin ${i + 1}/${steamData.length}:`, {
-      assetid: skin.assetid,
-      markethashname: skin.markethashname,
-    })
 
     try {
       const validatedSkin = externalSkinDataSchema.parse(skin)
       validatedSkins.push(validatedSkin)
-      console.log(`✅ Skin ${skin.assetid} validada com sucesso`)
     } catch (error) {
-      // Log detalhado do erro de validação
-      console.error(`❌ Erro ao validar skin ${skin.assetid}:`, {
-        markethashname: skin.markethashname,
-        error: error instanceof Error ? error.message : error,
-        skinData: skin,
-      })
       invalidSkins.push({
         assetid: skin.assetid,
         markethashname: skin.markethashname,
         error: error instanceof Error ? error.message : error,
       })
     }
-  }
-
-  console.log('=== RESULTADO DA VALIDAÇÃO ===')
-  console.log('Skins válidas:', validatedSkins.length)
-  console.log('Skins inválidas:', invalidSkins.length)
-  if (invalidSkins.length > 0) {
-    console.log('Detalhes das skins inválidas:', invalidSkins)
   }
 
   if (validatedSkins.length === 0) {
@@ -370,18 +273,15 @@ async function processInventoryData(
 
   // Obter taxa de câmbio atual
   const exchangeRate = await getExchangeRate()
-  console.log(`Taxa de câmbio utilizada: 1 USD = ${exchangeRate} BRL`)
 
   // Buscar skins atuais do usuário no banco para comparação
-  console.log('=== BUSCANDO SKINS EXISTENTES NO BANCO ===')
   const { data: existingSkins, error: fetchError } = await supabase
     .from('skins')
-    .select('assetid')
+    .select('assetid, price_manually_set, discount_price')
     .eq('user_id', userData.user.id)
     .eq('steamid', steamId)
 
   if (fetchError) {
-    console.error('Erro ao buscar skins existentes:', fetchError)
     return new Response(
       JSON.stringify({
         success: false,
@@ -394,31 +294,28 @@ async function processInventoryData(
     )
   }
 
-  console.log('Skins existentes no banco:', existingSkins?.length || 0)
-  console.log(
-    'AssetIDs existentes:',
-    existingSkins?.map((skin: { assetid: string }) => skin.assetid) || [],
-  )
-
   // Obter assetids do inventário atual e das skins existentes no banco
   const currentAssetIds = new Set(validatedSkins.map((skin) => skin.assetid))
   const existingAssetIds = new Set(
     existingSkins?.map((skin: { assetid: string }) => skin.assetid) || [],
   )
 
-  console.log('AssetIDs do inventário atual:', Array.from(currentAssetIds))
-  console.log('AssetIDs existentes no banco:', Array.from(existingAssetIds))
+  // Criar mapa das skins com preço manualmente definido
+  const manuallySetPrices = new Map(
+    existingSkins
+      ?.filter(
+        (skin: { price_manually_set: boolean }) => skin.price_manually_set,
+      )
+      .map((skin: { assetid: string; discount_price: string }) => [
+        skin.assetid,
+        skin.discount_price,
+      ]) || [],
+  )
 
   // Identificar skins que foram vendidas/removidas (existem no banco mas não no inventário atual)
   const soldAssetIds = Array.from(existingAssetIds).filter(
     (assetId) => !currentAssetIds.has(assetId as string),
   )
-
-  console.log('=== SKINS PARA REMOVER (VENDIDAS) ===')
-  console.log('Skins para remover:', soldAssetIds.length)
-  if (soldAssetIds.length > 0) {
-    console.log('AssetIDs para remover:', soldAssetIds)
-  }
 
   // Deletar skins que foram vendidas
   if (soldAssetIds.length > 0) {
@@ -430,7 +327,6 @@ async function processInventoryData(
       .in('assetid', soldAssetIds)
 
     if (deleteError) {
-      console.error('Erro ao deletar skins vendidas:', deleteError)
       return new Response(
         JSON.stringify({
           success: false,
@@ -442,38 +338,33 @@ async function processInventoryData(
         { status: 500, headers: { 'Content-Type': 'application/json' } },
       )
     }
-    console.log('✅ Skins vendidas removidas com sucesso')
   }
 
   // Transformar e preparar as skins atuais para o banco
-  console.log('=== TRANSFORMANDO SKINS PARA O BANCO ===')
-  const transformedSkins = validatedSkins.map((skin) => ({
-    ...transformExternalSkinData(skin, exchangeRate),
-    user_id: userData.user.id,
-    steamid: steamId,
-    updated_at: new Date().toISOString(),
-  }))
+  const transformedSkins = validatedSkins.map((skin) => {
+    const baseTransformedSkin = transformExternalSkinData(skin, exchangeRate)
 
-  console.log('Skins transformadas:', transformedSkins.length)
-  console.log(
-    'Detalhes das skins transformadas:',
-    transformedSkins.map((skin) => ({
-      assetid: skin.assetid,
-      markethashname: skin.markethashname,
-      marketname: skin.marketname,
-    })),
-  )
+    // Se a skin tem preço manualmente definido, preservar o discount_price e price_manually_set
+    if (manuallySetPrices.has(skin.assetid)) {
+      const manualPrice = manuallySetPrices.get(skin.assetid)
 
-  // Salvar/atualizar as skins atuais no banco usando upsert
-  console.log('=== SALVANDO SKINS NO BANCO ===')
-  console.log(
-    'Preparando para inserir/atualizar skins:',
-    transformedSkins.length,
-  )
-  console.log(
-    'AssetIDs que serão inseridos:',
-    transformedSkins.map((skin) => skin.assetid),
-  )
+      return {
+        ...baseTransformedSkin,
+        user_id: userData.user.id,
+        steamid: steamId,
+        updated_at: new Date().toISOString(),
+        discount_price: manualPrice,
+        price_manually_set: true,
+      }
+    }
+
+    return {
+      ...baseTransformedSkin,
+      user_id: userData.user.id,
+      steamid: steamId,
+      updated_at: new Date().toISOString(),
+    }
+  })
 
   const { data, error } = await supabase
     .from('skins')
@@ -483,11 +374,6 @@ async function processInventoryData(
     .select()
 
   if (error) {
-    console.error('❌ Erro ao salvar skins no banco:', error)
-    console.error('Detalhes do erro:', error.message)
-    console.error('Código do erro:', error.code)
-    console.error('Hint do erro:', error.hint)
-    console.error('Details do erro:', error.details)
     return new Response(
       JSON.stringify({
         success: false,
@@ -500,46 +386,13 @@ async function processInventoryData(
       { status: 500, headers: { 'Content-Type': 'application/json' } },
     )
   }
-
-  console.log('=== RESULTADO FINAL ===')
-  console.log('✅ Skins salvas no banco:', data?.length || 0)
-  console.log(
-    'steamLoginSecure:',
-    steamLoginSecure,
-    'Detalhes das skins salvas:',
-    data?.map((skin: SkinData) => ({
-      assetid: skin.assetid,
-      markethashname: skin.markethashname,
-      marketname: skin.marketname,
-    })) || [],
-  )
-
-  // Verificar se o número de skins salvas é igual ao número de skins transformadas
-  if (data && data.length !== transformedSkins.length) {
-    console.warn(
-      '⚠️ ATENÇÃO: Número de skins salvas difere do número de skins processadas!',
-    )
-    console.warn(`Skins transformadas: ${transformedSkins.length}`)
-    console.warn(`Skins salvas: ${data.length}`)
-    console.warn(
-      'AssetIDs transformados:',
-      transformedSkins.map((skin) => skin.assetid),
-    )
-    console.warn(
-      'AssetIDs salvos:',
-      data.map((skin: SkinData) => skin.assetid),
-    )
+  // Invalidar cache das skins para que as alterações sejam visíveis imediatamente
+  try {
+    await invalidateSkinsAndRevalidate()
+  } catch (cacheError) {
+    console.error('⚠️ Erro ao invalidar cache das skins:', cacheError)
+    // Não falha a operação se o cache falhar, apenas loga o erro
   }
-
-  console.log('=== PROCESSO CONCLUÍDO COM SUCESSO ===')
-  console.log('🎉 Inventário atualizado com sucesso!')
-  console.log('📊 RESUMO FINAL:')
-  console.log(`  📦 Total de skins recebidas da API: ${steamData.length}`)
-  console.log(`  ✅ Skins válidas processadas: ${validatedSkins.length}`)
-  console.log(`  💾 Skins salvas/atualizadas no banco: ${data?.length || 0}`)
-  console.log(`  🗑️  Skins removidas (vendidas): ${soldAssetIds.length}`)
-  console.log(`  ❌ Skins inválidas: ${invalidSkins.length}`)
-  console.log(`  💱 Taxa de câmbio utilizada: ${exchangeRate} BRL/USD`)
 
   return new Response(
     JSON.stringify({

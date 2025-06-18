@@ -16,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { useRouter, useSearchParams, usePathname } from 'next/navigation'
+import { useFilter } from '@/context/FilterContext'
 
 interface AdminPaginationControlsProps {
   currentPage: number
@@ -35,48 +35,7 @@ export function AdminPaginationControls({
   showItemsPerPage = true,
   itemsPerPageOptions = [12, 24, 36, 48],
 }: AdminPaginationControlsProps) {
-  const router = useRouter()
-  const pathname = usePathname()
-  const searchParams = useSearchParams()
-
-  const updateURL = (page: number, limit?: number) => {
-    const params = new URLSearchParams(searchParams.toString())
-
-    if (page > 1) {
-      params.set('page', page.toString())
-    } else {
-      params.delete('page')
-    }
-
-    if (limit && limit !== itemsPerPageOptions[0]) {
-      params.set('limit', limit.toString())
-    } else if (limit) {
-      params.delete('limit')
-    }
-
-    const newUrl = params.toString() ? `${pathname}?${params}` : pathname
-    router.replace(newUrl, { scroll: false })
-  }
-
-  const goToPage = (page: number) => {
-    updateURL(page)
-  }
-
-  const setItemsPerPage = (items: number) => {
-    updateURL(1, items)
-  }
-
-  const nextPage = () => {
-    if (currentPage < totalPages) {
-      goToPage(currentPage + 1)
-    }
-  }
-
-  const prevPage = () => {
-    if (currentPage > 1) {
-      goToPage(currentPage - 1)
-    }
-  }
+  const { goToPage, setItemsPerPage, nextPage, prevPage } = useFilter()
 
   // Se não há itens suficientes para paginar, não mostra a paginação
   if (totalItems <= itemsPerPageOptions[0]) {
@@ -131,12 +90,10 @@ export function AdminPaginationControls({
 
   return (
     <div className="flex flex-col items-center gap-4 mt-8">
-      {/* Informações sobre os itens */}
       <div className="text-sm text-muted-foreground">
         Mostrando {startItem} a {endItem} de {totalItems} skins
       </div>
 
-      {/* Paginação */}
       <Pagination>
         <PaginationContent>
           <PaginationItem>

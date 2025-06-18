@@ -27,6 +27,9 @@ export class SteamAuthService {
   static getInstance(): SteamAuthService {
     if (!SteamAuthService.instance) {
       SteamAuthService.instance = new SteamAuthService()
+      console.log('🆕 [STEAM_AUTH_SERVICE] New instance created')
+    } else {
+      console.log('♻️ [STEAM_AUTH_SERVICE] Using existing instance')
     }
     return SteamAuthService.instance
   }
@@ -129,9 +132,12 @@ export class SteamAuthService {
    * Implementa cache e controle de concorrência para evitar múltiplas sessões
    */
   async getSteamLoginSecure(accessToken: string): Promise<SteamAuthResult> {
+    console.log('🔑 [STEAM_AUTH_SERVICE] getSteamLoginSecure started')
+
     try {
       const refreshToken = await this.getRefreshToken(accessToken)
       if (!refreshToken) {
+        console.log('❌ [STEAM_AUTH_SERVICE] Refresh token not found')
         return {
           success: false,
           error:
@@ -139,29 +145,28 @@ export class SteamAuthService {
         }
       }
 
-      // Verificar se há um token em cache válido (menos de 5 minutos)
-      if (
-        this.cachedSteamLoginSecure &&
-        this.cachedSteamLoginSecure.refreshToken === refreshToken &&
-        Date.now() - this.cachedSteamLoginSecure.timestamp < 5 * 60 * 1000
-      ) {
-        console.log('🎯 Usando steam_login_secure do cache')
-        return {
-          success: true,
-          steamLoginSecure: this.cachedSteamLoginSecure.token,
-          refreshToken,
-        }
-      }
+      console.log(
+        '🔑 [STEAM_AUTH_SERVICE] Refresh token obtained:',
+        refreshToken,
+      )
+
+      // CACHE DESABILITADO - sempre gerar novo token
+      console.log(
+        '🔄 [STEAM_AUTH_SERVICE] Cache disabled, always generating new token',
+      )
 
       // Se já está gerando um token, aguardar a promessa existente
       if (this.isGeneratingToken) {
-        console.log('⏳ Aguardando geração de token em andamento...')
+        console.log(
+          '⏳ [STEAM_AUTH_SERVICE] Waiting for token generation in progress...',
+        )
         // Aguardar um pouco e tentar novamente
         await new Promise((resolve) => setTimeout(resolve, 100))
         return this.getSteamLoginSecure(accessToken)
       }
 
       this.isGeneratingToken = true
+      console.log('🏗️ [STEAM_AUTH_SERVICE] Starting new token generation')
 
       try {
         const result = await this.renewCookiesWithRefreshToken(refreshToken)
@@ -173,15 +178,27 @@ export class SteamAuthService {
             timestamp: Date.now(),
             refreshToken,
           }
-          console.log('✅ Novo steam_login_secure gerado e armazenado em cache')
+          console.log(
+            '✅ [STEAM_AUTH_SERVICE] New steam_login_secure generated and cached - Token:',
+            result.steamLoginSecure,
+          )
+        } else {
+          console.log(
+            '❌ [STEAM_AUTH_SERVICE] Failed to generate new token:',
+            result.error,
+          )
         }
 
         return result
       } finally {
         this.isGeneratingToken = false
+        console.log('🔓 [STEAM_AUTH_SERVICE] Releasing token generation lock')
       }
     } catch (error) {
-      console.error('Erro no getSteamLoginSecure:', error)
+      console.error(
+        '❌ [STEAM_AUTH_SERVICE] Error in getSteamLoginSecure:',
+        error,
+      )
       this.isGeneratingToken = false
       return {
         success: false,
@@ -196,14 +213,28 @@ export class SteamAuthService {
   private async renewCookiesWithRefreshToken(
     refreshToken: string,
   ): Promise<SteamAuthResult> {
+    console.log('🔄 [RENEWAL] Starting cookie renewal with refresh token')
+
     try {
       this.loginSession = new LoginSession(EAuthTokenPlatformType.WebBrowser)
       this.loginSession.refreshToken = refreshToken
+      console.log('🔄 [RENEWAL] LoginSession created, obtaining cookies...')
 
       const cookies = await this.loginSession.getWebCookies()
+      console.log(
+        '🍪 [RENEWAL] Cookies obtained from Steam:',
+        cookies.length,
+        'cookies received',
+      )
+
       const steamLoginSecure = this.extractSteamLoginSecure(cookies)
+      console.log('🔍 [RENEWAL] steamLoginSecure extraction:', {
+        found: !!steamLoginSecure,
+        token: steamLoginSecure || 'not found',
+      })
 
       if (steamLoginSecure) {
+        console.log('✅ [RENEWAL] steamLoginSecure extracted successfully')
         return {
           success: true,
           steamLoginSecure,
@@ -211,12 +242,13 @@ export class SteamAuthService {
         }
       }
 
+      console.log('❌ [RENEWAL] steamLoginSecure not found in cookies')
       return {
         success: false,
         error: 'steam_login_secure não encontrado nos cookies',
       }
     } catch (error) {
-      console.error('Erro ao renovar cookies:', error)
+      console.error('❌ [RENEWAL] Error renewing cookies:', error)
       return {
         success: false,
         error: `Falha ao renovar cookies com refresh token: ${error}`,
@@ -321,7 +353,7 @@ export class SteamAuthService {
   clearCache(): void {
     this.cachedSteamLoginSecure = null
     this.isGeneratingToken = false
-    console.log('🧹 Cache de steam_login_secure limpo')
+    console.log('🧹 [STEAM_AUTH_SERVICE] steam_login_secure cache cleared')
   }
 
   /**

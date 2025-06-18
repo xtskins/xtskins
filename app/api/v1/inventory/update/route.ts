@@ -1,6 +1,7 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { ApiResponse } from '@/lib/types/skin'
 import { z } from 'zod'
+import { invalidateSkinsAndRevalidate } from '@/lib/server/cache/skins-cache'
 
 const updateInventoryRequestSchema = z.object({
   skinId: z.string().uuid('ID da skin deve ser um UUID válido'),
@@ -89,12 +90,14 @@ export async function POST(req: Request): Promise<Response> {
       updated_at: string
       discount_price?: string
       is_visible?: boolean
+      price_manually_set?: boolean
     } = {
       updated_at: new Date().toISOString(),
     }
 
     if (validatedData.discount_price !== undefined) {
       updateData.discount_price = validatedData.discount_price
+      updateData.price_manually_set = true // Marcar que o preço foi alterado manualmente
     }
 
     if (validatedData.is_visible !== undefined) {
@@ -135,6 +138,16 @@ export async function POST(req: Request): Promise<Response> {
         }),
         { status: 500, headers: { 'Content-Type': 'application/json' } },
       )
+    }
+
+    // Invalidar cache das skins para que as alterações sejam visíveis imediatamente
+    console.log('🔄 Skin atualizada, invalidando cache das skins...')
+    try {
+      await invalidateSkinsAndRevalidate()
+      console.log('✅ Cache das skins invalidado com sucesso após atualização')
+    } catch (cacheError) {
+      console.error('⚠️ Erro ao invalidar cache das skins:', cacheError)
+      // Não falha a operação se o cache falhar, apenas loga o erro
     }
 
     const result: ApiResponse<typeof updatedSkin> = {

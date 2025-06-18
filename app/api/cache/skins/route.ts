@@ -1,40 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import {
-  invalidateSkinsCache,
-  refreshSkinsCache,
+  invalidateSkinsAndRevalidate,
+  refreshSkinsAndRevalidate,
 } from '@/lib/server/cache/skins-cache'
-import { revalidatePath } from 'next/cache'
 
 export async function POST(request: NextRequest) {
   try {
     const { action } = await request.json()
     console.log('🔄 API Cache chamada com action:', action)
 
-    // Revalida as páginas de forma mais abrangente
-    const pathsToRevalidate = [
-      '/',
-      '/skins',
-      '/admin',
-      '/profile',
-      '/inventory',
-    ]
-
     switch (action) {
       case 'invalidate': {
         console.log('🗑️  Executando invalidação via API...')
 
-        // Invalida o cache
-        invalidateSkinsCache()
-
-        for (const path of pathsToRevalidate) {
-          try {
-            revalidatePath(path, 'page')
-            revalidatePath(path, 'layout')
-            console.log(`✅ API: Revalidação de ${path} concluída`)
-          } catch (error) {
-            console.log(`⚠️  API: Erro ao revalidar ${path}:`, error)
-          }
-        }
+        // Invalida o cache e revalida as páginas automaticamente
+        await invalidateSkinsAndRevalidate()
 
         return NextResponse.json(
           {
@@ -57,19 +37,8 @@ export async function POST(request: NextRequest) {
       case 'refresh': {
         console.log('🔄 Executando refresh via API...')
 
-        // Força a atualização do cache
-        const skinsData = await refreshSkinsCache()
-
-        // Revalida as páginas
-        for (const path of pathsToRevalidate) {
-          try {
-            revalidatePath(path, 'page')
-            revalidatePath(path, 'layout')
-            console.log(`✅ API: Revalidação de ${path} concluída`)
-          } catch (error) {
-            console.log(`⚠️  API: Erro ao revalidar ${path}:`, error)
-          }
-        }
+        // Força a atualização do cache e revalida as páginas automaticamente
+        const skinsData = await refreshSkinsAndRevalidate()
 
         return NextResponse.json(
           {
