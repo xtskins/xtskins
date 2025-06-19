@@ -70,8 +70,7 @@ export async function POST(req: Request): Promise<Response> {
         JSON.stringify({
           success: false,
           error: {
-            message:
-              'Acesso negado. Apenas administradores podem acessar esta funcionalidade.',
+            message: 'Unauthorized.',
             code: 'FORBIDDEN',
           },
         }),

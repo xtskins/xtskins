@@ -12,7 +12,7 @@ export async function GET(req: Request): Promise<Response> {
         JSON.stringify({
           success: false,
           error: {
-            message: 'userId e accessToken são obrigatórios',
+            message: 'Você não está autorizado a acessar este recurso',
             code: 'VALIDATION_ERROR',
           },
         }),

@@ -5,7 +5,7 @@ export const userSchema = z.object({
   email: z.string().email(),
   name: z.string(),
   full_name: z.string(),
-  avatar_url: z.string().url(),
+  avatar_url: z.string().url().nullable(),
   role: z.enum(['admin', 'client']),
   level: z.string(),
   steam_id: z.string().nullable(),
