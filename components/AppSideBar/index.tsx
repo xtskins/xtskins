@@ -127,7 +127,7 @@ export function AppSidebar({ serverUserData, ...props }: AppSidebarProps) {
             user={{
               name: currentProfile.name,
               email: currentProfile.email,
-              avatar_url: currentProfile.avatar_url,
+              avatar_url: currentProfile.avatar_url || '',
             }}
             loading={false}
           />
