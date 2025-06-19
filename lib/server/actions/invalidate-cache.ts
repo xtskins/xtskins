@@ -1,8 +1,8 @@
 'use server'
 
 import {
-  invalidateSkinsAndRevalidate,
   refreshSkinsAndRevalidate,
+  invalidateSkinsWithTags,
 } from '../cache/skins-cache'
 
 /**
@@ -12,8 +12,9 @@ export async function invalidateSkinsServerCache() {
   try {
     console.log('🔄 Iniciando invalidação do cache das skins...')
 
-    // Invalida o cache em memória e revalida as páginas automaticamente
-    await invalidateSkinsAndRevalidate()
+    // Usa invalidação por tags (melhor para ISR)
+    console.log('🏷️ Usando invalidação por tags para manter ISR...')
+    await invalidateSkinsWithTags()
 
     return { success: true, message: 'Cache das skins invalidado com sucesso' }
   } catch (error) {

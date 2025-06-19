@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import {
-  invalidateSkinsAndRevalidate,
+  invalidateSkinsWithTags,
   refreshSkinsAndRevalidate,
 } from '@/lib/server/cache/skins-cache'
 
@@ -13,8 +13,8 @@ export async function POST(request: NextRequest) {
       case 'invalidate': {
         console.log('🗑️  Executando invalidação via API...')
 
-        // Invalida o cache e revalida as páginas automaticamente
-        await invalidateSkinsAndRevalidate()
+        // Invalida o cache usando tags (melhor para ISR)
+        await invalidateSkinsWithTags()
 
         return NextResponse.json(
           {
@@ -25,10 +25,12 @@ export async function POST(request: NextRequest) {
           {
             headers: {
               'Cache-Control':
-                'no-store, no-cache, must-revalidate, proxy-revalidate',
+                'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0, s-maxage=0',
               Pragma: 'no-cache',
               Expires: '0',
               'Surrogate-Control': 'no-store',
+              'CDN-Cache-Control': 'no-store',
+              'Vercel-CDN-Cache-Control': 'max-age=0',
             },
           },
         )
@@ -53,10 +55,12 @@ export async function POST(request: NextRequest) {
           {
             headers: {
               'Cache-Control':
-                'no-store, no-cache, must-revalidate, proxy-revalidate',
+                'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0, s-maxage=0',
               Pragma: 'no-cache',
               Expires: '0',
               'Surrogate-Control': 'no-store',
+              'CDN-Cache-Control': 'no-store',
+              'Vercel-CDN-Cache-Control': 'max-age=0',
             },
           },
         )
@@ -99,9 +103,11 @@ export async function GET() {
     {
       headers: {
         'Cache-Control':
-          'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0, s-maxage=0',
         Pragma: 'no-cache',
         Expires: '0',
+        'CDN-Cache-Control': 'no-store',
+        'Vercel-CDN-Cache-Control': 'max-age=0',
       },
     },
   )
