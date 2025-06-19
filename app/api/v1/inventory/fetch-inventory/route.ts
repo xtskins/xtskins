@@ -293,6 +293,48 @@ async function processInventoryData(
     )
   }
 
+  // VERIFICAÇÃO PALIATIVA: Detectar falha silenciosa da API externa
+  // Se o usuário já tem skins no banco e TODAS as skins retornadas têm tradable=true,
+  // isso indica uma falha silenciosa da API externa
+  const userHasExistingSkins = existingSkins && existingSkins.length > 0
+
+  if (userHasExistingSkins) {
+    const allSkinsAreTradable = validatedSkins.every(
+      (skin) => skin.tradable === true,
+    )
+
+    if (allSkinsAreTradable) {
+      console.log(
+        '⚠️ [API_FAILURE_DETECTION] Possível falha silenciosa da API externa detectada:',
+        {
+          userHasExistingSkins,
+          totalValidatedSkins: validatedSkins.length,
+          allSkinsAreTradable,
+          steamId,
+        },
+      )
+
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: {
+            message:
+              'Falha temporária na API do Steam detectada. Todas as skins retornadas estão como tradable=true, o que indica um problema na API externa. Tente novamente em alguns minutos.',
+            code: 'STEAM_API_TEMPORARY_FAILURE',
+            details: {
+              totalSkins: validatedSkins.length,
+              allTradable: allSkinsAreTradable,
+              userHasExistingSkins,
+              suggestion:
+                'A API externa está com falha silenciosa. Aguarde alguns minutos e tente novamente.',
+            },
+          },
+        }),
+        { status: 503, headers: { 'Content-Type': 'application/json' } },
+      )
+    }
+  }
+
   // Obter assetids do inventário atual e das skins existentes no banco
   const currentAssetIds = new Set(validatedSkins.map((skin) => skin.assetid))
   const existingAssetIds = new Set(
@@ -314,6 +356,11 @@ async function processInventoryData(
   // Identificar skins que foram vendidas/removidas (existem no banco mas não no inventário atual)
   const soldAssetIds = Array.from(existingAssetIds).filter(
     (assetId) => !currentAssetIds.has(assetId as string),
+  )
+
+  // Identificar skins novas (existem no inventário atual mas não no banco)
+  const newAssetIds = Array.from(currentAssetIds).filter(
+    (assetId) => !existingAssetIds.has(assetId as string),
   )
 
   // Deletar skins que foram vendidas
@@ -365,12 +412,9 @@ async function processInventoryData(
     }
   })
 
-  const { data, error } = await supabase
-    .from('skins')
-    .upsert(transformedSkins, {
-      onConflict: 'assetid',
-    })
-    .select()
+  const { error } = await supabase.from('skins').upsert(transformedSkins, {
+    onConflict: 'assetid',
+  })
 
   if (error) {
     return new Response(
@@ -400,7 +444,7 @@ async function processInventoryData(
       data: {
         totalSkinsReceived: steamData.length,
         totalSkins: validatedSkins.length,
-        savedSkins: data?.length || 0,
+        savedSkins: newAssetIds.length,
         deletedSkins: soldAssetIds.length,
         invalidSkins: invalidSkins.length,
         exchangeRate,

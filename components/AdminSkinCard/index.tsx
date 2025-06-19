@@ -119,7 +119,7 @@ export default function AdminSkinCard({ skinData }: AdminSkinCardProps) {
   return (
     <div className="flex justify-center">
       <div
-        className={`group relative mx-auto flex h-[590px] max-w-[300px] flex-col justify-between rounded-lg bg-white pt-4 drop-shadow-2xl hover:shadow-2xl hover:duration-500 dark:bg-[#141414] lg:h-[570px] lg:w-[265px] ${
+        className={`group relative mx-auto flex h-[590px] max-w-[300px] flex-col justify-between rounded-lg bg-white pt-4 drop-shadow-2xl hover:shadow-2xl hover:duration-500 dark:bg-[#232323] lg:h-[570px] lg:w-[265px] dark:border dark:border-[#343434] ${
           !editedIsVisible ? 'opacity-50 ring-2 ring-red-500' : ''
         }`}
       >

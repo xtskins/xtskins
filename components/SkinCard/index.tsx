@@ -86,6 +86,7 @@ export default function SkinCard({ skinData }: SkinCardProps) {
             quality={100}
             alt={`Imagem da skin ${skinData.marketname}`}
             className="z-10 translate-y-[-10px] scale-105 transform pt-[25px] transition-transform duration-300 min-[425px]:group-hover:rotate-6 min-[425px]:group-hover:scale-[1.15]"
+            priority
           />
 
           <div className="absolute left-[50px] top-[8.5rem] z-10">

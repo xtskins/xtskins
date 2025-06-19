@@ -6,11 +6,28 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useAdminSkins } from '@/hooks/useAdminSkins'
 import { useSteamAuthCheck } from '@/hooks/useSteamAuthCheck'
 import { useFilter, FilterProvider } from '@/context/FilterContext'
+import { cn } from '@/lib/utils'
 import AdminSkinCard from '@/components/AdminSkinCard'
 import SteamAuthDialog from '@/components/SteamAuthDialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { AdminPaginationControls } from '@/components/AdminPagination'
-import UpdateInventoryButton from '@/components/UpdateInventory'
+import UpdateInventoryDialog from '@/components/UpdateInventoryDialog'
+
+function StatusDot({ color }: { color: string }) {
+  return (
+    <span className="relative flex h-2 w-2">
+      <span
+        className={cn(
+          'absolute inline-flex h-full w-full animate-ping rounded-full opacity-75',
+          color,
+        )}
+      />
+      <span
+        className={cn('relative inline-flex h-2 w-2 rounded-full', color)}
+      />
+    </span>
+  )
+}
 
 function AdminPageContent() {
   const router = useRouter()
@@ -51,13 +68,20 @@ function AdminPageContent() {
     return (
       <div className="bg-background relative flex w-full flex-col items-center overflow-hidden p-4">
         <div className="z-10 flex h-full w-full max-w-7xl flex-col">
-          <div className="mb-6 flex items-center justify-between">
-            <h2 className="text-2xl font-bold">Painel de Administração</h2>
-            <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-              <Skeleton className="h-3 w-3 rounded-full" />
-              <Skeleton className="h-4 w-16" />
-              <Skeleton className="h-3 w-3 rounded-full ml-4" />
-              <Skeleton className="h-4 w-16" />
+          <div className="mb-6 space-y-3">
+            <div className="flex flex-col space-y-3 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
+              <h2 className="text-base font-bold">Painel de Administração</h2>
+              <div className="flex flex-col space-y-2 lg:flex-row lg:items-center lg:gap-4 lg:space-y-0">
+                <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                  <Skeleton className="h-2 w-2 rounded-full" />
+                  <Skeleton className="h-4 w-16" />
+                  <Skeleton className="h-2 w-2 rounded-full" />
+                  <Skeleton className="h-4 w-16" />
+                </div>
+                <div className="flex justify-center lg:justify-start">
+                  <Skeleton className="h-9 w-32 rounded-md" />
+                </div>
+              </div>
             </div>
           </div>
 
@@ -65,15 +89,11 @@ function AdminPageContent() {
             <Skeleton className="h-12 w-full rounded-lg" />
           </div>
 
-          <div className="mb-6">
-            <Skeleton className="h-10 w-48 rounded-lg" />
-          </div>
-
           <div className="mb-4 flex items-center justify-between">
-            <Skeleton className="h-7 w-40" />
+            <Skeleton className="h-5 w-40" />
           </div>
 
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {Array.from({ length: 8 }, (_, i) => (
               <div key={i} className="flex justify-center">
                 <div className="space-y-4">
@@ -120,7 +140,7 @@ function AdminPageContent() {
         <div className="bg-background relative flex w-full flex-col items-center overflow-hidden p-4">
           <div className="z-10 flex h-full w-full max-w-7xl flex-col items-center justify-center min-h-[50vh]">
             <div className="text-center space-y-4">
-              <h2 className="text-2xl font-bold">Painel de Administração</h2>
+              <h2 className="text-base font-bold">Painel de Administração</h2>
               <p className="text-gray-600 dark:text-gray-400">
                 Configuração Steam necessária para acessar o painel
               </p>
@@ -141,13 +161,22 @@ function AdminPageContent() {
     return (
       <div className="bg-background relative flex w-full flex-col items-center overflow-hidden p-4">
         <div className="z-10 flex h-full w-full max-w-7xl flex-col">
-          <div className="mb-6 flex items-center justify-between">
-            <h2 className="text-2xl font-bold">Painel de Administração</h2>
-            <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-              <span className="flex h-3 w-3 rounded-full bg-green-500"></span>
-              Visíveis: {filteredSkins.filter((skin) => skin.is_visible).length}
-              <span className="ml-4 flex h-3 w-3 rounded-full bg-red-500"></span>
-              Ocultas: {filteredSkins.filter((skin) => !skin.is_visible).length}
+          <div className="mb-6 space-y-3">
+            <div className="flex flex-col space-y-3 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
+              <h2 className="text-base font-bold">Painel de Administração</h2>
+              <div className="flex flex-col space-y-2 lg:flex-row lg:items-center lg:gap-4 lg:space-y-0">
+                <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                  <StatusDot color="bg-green-500" />
+                  Visíveis:{' '}
+                  {filteredSkins.filter((skin) => skin.is_visible).length}
+                  <StatusDot color="bg-red-500" />
+                  Ocultas:{' '}
+                  {filteredSkins.filter((skin) => !skin.is_visible).length}
+                </div>
+                <div className="flex justify-center lg:justify-start">
+                  <UpdateInventoryDialog />
+                </div>
+              </div>
             </div>
           </div>
 
@@ -155,7 +184,7 @@ function AdminPageContent() {
             <div className="mb-4">
               <div className="rounded-lg border border-green-200 bg-green-50 p-3 dark:border-green-800 dark:bg-green-950">
                 <div className="flex items-center gap-2 text-sm">
-                  <span className="flex h-2 w-2 rounded-full bg-green-500"></span>
+                  <StatusDot color="bg-green-500" />
                   <span className="text-green-700 dark:text-green-300">
                     Steam configurado - Atualização automática ativa
                   </span>
@@ -163,10 +192,6 @@ function AdminPageContent() {
               </div>
             </div>
           )}
-
-          <div className="mb-6">
-            <UpdateInventoryButton />
-          </div>
 
           <div className="flex flex-col items-center justify-center min-h-[30vh]">
             <p className="text-lg text-gray-600 dark:text-gray-400">
@@ -185,13 +210,22 @@ function AdminPageContent() {
   return (
     <div className="bg-background relative flex w-full flex-col items-center overflow-hidden p-4">
       <div className="z-10 flex h-full w-full max-w-7xl flex-col">
-        <div className="mb-6 flex items-center justify-between">
-          <h2 className="text-2xl font-bold">Painel de Administração</h2>
-          <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-            <span className="flex h-3 w-3 rounded-full bg-green-500"></span>
-            Visíveis: {filteredSkins.filter((skin) => skin.is_visible).length}
-            <span className="ml-4 flex h-3 w-3 rounded-full bg-red-500"></span>
-            Ocultas: {filteredSkins.filter((skin) => !skin.is_visible).length}
+        <div className="mb-6 space-y-3">
+          <div className="flex flex-col space-y-3 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
+            <h2 className="text-base font-bold">Painel de Administração</h2>
+            <div className="flex flex-col space-y-2 lg:flex-row lg:items-center lg:gap-4 lg:space-y-0">
+              <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                <StatusDot color="bg-green-500" />
+                Visíveis:{' '}
+                {filteredSkins.filter((skin) => skin.is_visible).length}
+                <StatusDot color="bg-red-500" />
+                Ocultas:{' '}
+                {filteredSkins.filter((skin) => !skin.is_visible).length}
+              </div>
+              <div className="flex justify-center lg:justify-start">
+                <UpdateInventoryDialog />
+              </div>
+            </div>
           </div>
         </div>
 
@@ -199,7 +233,7 @@ function AdminPageContent() {
           <div className="mb-4">
             <div className="rounded-lg border border-green-200 bg-green-50 p-3 dark:border-green-800 dark:bg-green-950">
               <div className="flex items-center gap-2 text-sm">
-                <span className="flex h-2 w-2 rounded-full bg-green-500"></span>
+                <StatusDot color="bg-green-500" />
                 <span className="text-green-700 dark:text-green-300">
                   Steam configurado - Atualização automática ativa
                 </span>
@@ -208,12 +242,8 @@ function AdminPageContent() {
           </div>
         )}
 
-        <div className="mb-6">
-          <UpdateInventoryButton />
-        </div>
-
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-xl font-semibold">
+          <h3 className="text-sm font-semibold">
             {activeFilterText ? (
               <>
                 {activeFilterText} ({filteredSkins.length})
@@ -229,7 +259,7 @@ function AdminPageContent() {
           )}
         </div>
 
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {paginatedSkins.map((skin) => (
             <div key={skin.id} className="flex justify-center">
               <AdminSkinCard
@@ -264,13 +294,20 @@ export default function AdminPage() {
     return (
       <div className="bg-background relative flex w-full flex-col items-center overflow-hidden p-4">
         <div className="z-10 flex h-full w-full max-w-7xl flex-col">
-          <div className="mb-6 flex items-center justify-between">
-            <h2 className="text-2xl font-bold">Painel de Administração</h2>
-            <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-              <Skeleton className="h-3 w-3 rounded-full" />
-              <Skeleton className="h-4 w-16" />
-              <Skeleton className="h-3 w-3 rounded-full ml-4" />
-              <Skeleton className="h-4 w-16" />
+          <div className="mb-6 space-y-3">
+            <div className="flex flex-col space-y-3 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
+              <h2 className="text-base font-bold">Painel de Administração</h2>
+              <div className="flex flex-col space-y-2 lg:flex-row lg:items-center lg:gap-4 lg:space-y-0">
+                <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                  <Skeleton className="h-2 w-2 rounded-full" />
+                  <Skeleton className="h-4 w-16" />
+                  <Skeleton className="h-2 w-2 rounded-full" />
+                  <Skeleton className="h-4 w-16" />
+                </div>
+                <div className="flex justify-center lg:justify-start">
+                  <Skeleton className="h-9 w-32 rounded-md" />
+                </div>
+              </div>
             </div>
           </div>
 
@@ -278,15 +315,11 @@ export default function AdminPage() {
             <Skeleton className="h-12 w-full rounded-lg" />
           </div>
 
-          <div className="mb-6">
-            <Skeleton className="h-10 w-48 rounded-lg" />
-          </div>
-
           <div className="mb-4 flex items-center justify-between">
-            <Skeleton className="h-7 w-40" />
+            <Skeleton className="h-5 w-40" />
           </div>
 
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {Array.from({ length: 8 }, (_, i) => (
               <div key={i} className="flex justify-center">
                 <div className="space-y-4">
