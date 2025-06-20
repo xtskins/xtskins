@@ -95,7 +95,6 @@ export function OrderProvider({ children }: OrderProviderProps) {
     return items.find((item) => item.id === skinId)
   }
 
-  // Estados calculados
   const orderState = useMemo(() => {
     const totalItems = items.length
 
