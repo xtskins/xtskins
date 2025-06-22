@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { Frame, Instagram } from 'lucide-react'
+import { Frame, Instagram, Package } from 'lucide-react'
 import { AK47Icon } from '@/components/icons/AK47Icon'
 
 import { NavMain } from '@/components/NavMain'
@@ -88,6 +88,12 @@ const data = {
       url: 'https://www.instagram.com/xtskins/',
       icon: Instagram,
       target: '_blank',
+    },
+    {
+      name: 'Solicitar Skin',
+      url: '/solicitar-skin',
+      icon: Package,
+      target: '_self',
     },
   ],
 }

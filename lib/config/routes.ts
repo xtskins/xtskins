@@ -18,6 +18,11 @@ export const routes: Record<string, RouteConfig> = {
     label: 'Perfil',
     path: '/profile',
   },
+  requestSkin: {
+    label: 'Solicitar Skin',
+    path: '/solicitar-skin',
+    parent: 'home',
+  },
 }
 
 export function getBreadcrumbsForPath(currentPath: string): RouteConfig[] {

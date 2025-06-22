@@ -4,22 +4,10 @@ import SkinCard from '@/components/SkinCard'
 import { DotPattern } from '@/components/ui/dot-pattern'
 import { useFilter } from '@/context/FilterContext'
 import { PaginationControls } from '@/components/Pagination'
-import { SkinRequestButton } from '@/components/SkinRequestModal'
-import { items } from '@/database/script'
 import { cn } from '@/lib/utils'
 
 export default function Page() {
   const { paginatedSkins } = useFilter()
-
-  const handleSkinSelect = (skin: {
-    markethashname: string
-    itemgroup: string
-    itemtype: string
-  }) => {
-    console.log('Skin selecionada:', skin)
-    // Aqui você pode implementar a lógica depois
-    alert(`Skin selecionada: ${skin.markethashname}`)
-  }
 
   if (!paginatedSkins || paginatedSkins.length === 0) {
     return (
@@ -34,11 +22,6 @@ export default function Page() {
   return (
     <div className="bg-background relative flex w-full flex-col items-center overflow-hidden p-4 h-full">
       <div className="z-10 flex h-full w-full max-w-7xl flex-col">
-        {/* Botão de Solicitar Skin */}
-        <div className="mb-6 flex justify-center">
-          <SkinRequestButton skins={items} onSkinSelect={handleSkinSelect} />
-        </div>
-
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {paginatedSkins.map((skin) => (
             <div key={skin.id} className="flex justify-center">

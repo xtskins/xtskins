@@ -18,7 +18,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { Search, X, Package } from 'lucide-react'
+import { Search, X, Package, Filter, ChevronRight } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 interface SkinData {
   markethashname: string
@@ -32,11 +33,12 @@ interface SkinRequestModalProps {
   children?: React.ReactNode
 }
 
-// Hook simples para filtros
-function useSimpleFilter(skins: SkinData[]) {
+// Hook para filtros melhorado
+function useEnhancedFilter(skins: SkinData[]) {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedGroup, setSelectedGroup] = useState('')
   const [selectedType, setSelectedType] = useState('')
+  const [showFilters, setShowFilters] = useState(false)
 
   // Opções únicas para os selects
   const filterOptions = useMemo(() => {
@@ -108,13 +110,14 @@ function useSimpleFilter(skins: SkinData[]) {
       })
     }
 
-    return filtered.slice(0, 100) // Limita a 100 resultados para performance
+    return filtered.slice(0, 150) // Aumentei o limite para 150
   }, [skins, searchTerm, selectedGroup, selectedType])
 
   const clearFilters = () => {
     setSearchTerm('')
     setSelectedGroup('')
     setSelectedType('')
+    setShowFilters(false)
   }
 
   const hasFilters =
@@ -133,6 +136,8 @@ function useSimpleFilter(skins: SkinData[]) {
     filterOptions,
     clearFilters,
     hasFilters,
+    showFilters,
+    setShowFilters,
   }
 }
 
@@ -153,7 +158,9 @@ export function SkinRequestModal({
     filterOptions,
     clearFilters,
     hasFilters,
-  } = useSimpleFilter(skins)
+    showFilters,
+    setShowFilters,
+  } = useEnhancedFilter(skins)
 
   const handleSkinSelect = (skin: SkinData) => {
     onSkinSelect(skin)
@@ -164,6 +171,10 @@ export function SkinRequestModal({
   const handleGroupChange = (value: string) => {
     setSelectedGroup(value)
     setSelectedType('') // Limpa tipo quando muda grupo
+  }
+
+  const toggleFilters = () => {
+    setShowFilters(!showFilters)
   }
 
   return (
@@ -177,124 +188,204 @@ export function SkinRequestModal({
         )}
       </DialogTrigger>
 
-      <DialogContent className="max-w-2xl max-h-[80vh]">
-        <DialogHeader>
-          <DialogTitle>Solicitar Skin</DialogTitle>
+      <DialogContent className="w-[85%] max-w-4xl h-[90vh] max-h-[600px] p-0 gap-0 flex flex-col">
+        <DialogHeader className="px-4 py-3 border-b shrink-0">
+          <DialogTitle className="text-lg font-semibold">
+            Solicitar Skin
+          </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
-          {/* Filtros */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Busca por nome */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <div className="flex flex-col h-full overflow-hidden">
+          {/* Área de Busca e Filtros */}
+          <div className="px-4 py-3 border-b bg-muted/20 shrink-0">
+            {/* Busca Principal */}
+            <div className="relative mb-3">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground z-10" />
               <Input
-                placeholder="Nome da skin..."
+                placeholder="Busque por nome da skin ou tipo de arma..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className="pl-10 pr-12 h-11 text-base"
               />
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={toggleFilters}
+                className={cn(
+                  'absolute right-1 top-1/2 -translate-y-1/2 h-9 w-9 p-0 transition-colors',
+                  showFilters || hasFilters
+                    ? 'bg-primary text-primary-foreground'
+                    : '',
+                )}
+              >
+                <Filter className="h-4 w-4" />
+              </Button>
             </div>
 
-            {/* Grupo */}
-            <Select value={selectedGroup} onValueChange={handleGroupChange}>
-              <SelectTrigger>
-                <SelectValue placeholder="Grupo" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os grupos</SelectItem>
-                {filterOptions.groups.map((group) => (
-                  <SelectItem key={group} value={group} className="capitalize">
-                    {group}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {/* Filtros Avançados */}
+            {showFilters && (
+              <div className="space-y-3 animate-in slide-in-from-top-2 duration-200">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Grupo */}
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                      Categoria
+                    </label>
+                    <Select
+                      value={selectedGroup}
+                      onValueChange={handleGroupChange}
+                    >
+                      <SelectTrigger className="h-10 w-full">
+                        <SelectValue placeholder="Todas as categorias" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todas as categorias</SelectItem>
+                        {filterOptions.groups.map((group) => (
+                          <SelectItem
+                            key={group}
+                            value={group}
+                            className="capitalize"
+                          >
+                            {group}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-            {/* Tipo */}
-            <Select value={selectedType} onValueChange={setSelectedType}>
-              <SelectTrigger>
-                <SelectValue placeholder="Tipo" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os tipos</SelectItem>
-                {filterOptions.types.map((type) => (
-                  <SelectItem key={type} value={type} className="capitalize">
-                    {type}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+                  {/* Tipo */}
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                      Tipo de Arma
+                    </label>
+                    <Select
+                      value={selectedType}
+                      onValueChange={setSelectedType}
+                    >
+                      <SelectTrigger className="h-10 w-full">
+                        <SelectValue placeholder="Todos os tipos" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos os tipos</SelectItem>
+                        {filterOptions.types.map((type) => (
+                          <SelectItem
+                            key={type}
+                            value={type}
+                            className="capitalize"
+                          >
+                            {type}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+            )}
 
-          {/* Filtros ativos e estatísticas */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">
-                {filteredSkins.length} skins encontradas
-                {filteredSkins.length === 100 && ' (mostrando primeiras 100)'}
-              </span>
+            {/* Status e Ações */}
+            <div className="flex items-center justify-between mt-3 pt-3 border-t">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-muted-foreground">
+                  {filteredSkins.length} skins
+                  {filteredSkins.length === 150 && ' (mostrando primeiras 150)'}
+                </span>
+
+                {/* Badges dos filtros ativos */}
+                <div className="flex gap-1">
+                  {selectedGroup && selectedGroup !== 'all' && (
+                    <Badge variant="secondary" className="text-xs">
+                      {selectedGroup}
+                    </Badge>
+                  )}
+                  {selectedType && selectedType !== 'all' && (
+                    <Badge variant="secondary" className="text-xs">
+                      {selectedType}
+                    </Badge>
+                  )}
+                </div>
+              </div>
 
               {hasFilters && (
-                <Button variant="ghost" size="sm" onClick={clearFilters}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearFilters}
+                  className="text-xs"
+                >
                   <X className="mr-1 h-3 w-3" />
                   Limpar
                 </Button>
               )}
             </div>
-
-            {/* Badges dos filtros ativos */}
-            <div className="flex gap-1">
-              {selectedGroup && selectedGroup !== 'all' && (
-                <Badge variant="secondary">{selectedGroup}</Badge>
-              )}
-              {selectedType && selectedType !== 'all' && (
-                <Badge variant="secondary">{selectedType}</Badge>
-              )}
-            </div>
           </div>
 
-          {/* Lista de resultados */}
-          <div className="border rounded-lg max-h-96 overflow-y-auto">
+          {/* Lista de Resultados */}
+          <div className="flex-1 overflow-hidden">
             {filteredSkins.length === 0 ? (
-              <div className="p-8 text-center text-muted-foreground">
-                <Package className="mx-auto h-12 w-12 mb-4 opacity-50" />
-                <p>Nenhuma skin encontrada</p>
-                <p className="text-sm">Tente ajustar os filtros</p>
+              <div className="flex items-center justify-center h-full p-8">
+                <div className="text-center">
+                  <Package className="mx-auto h-16 w-16 mb-4 text-muted-foreground/50" />
+                  <h3 className="text-lg font-medium mb-2">
+                    Nenhuma skin encontrada
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Tente ajustar os filtros ou alterar os termos da busca
+                  </p>
+                  {hasFilters && (
+                    <Button variant="outline" size="sm" onClick={clearFilters}>
+                      Limpar Filtros
+                    </Button>
+                  )}
+                </div>
               </div>
             ) : (
-              <div className="divide-y">
-                {filteredSkins.map((skin, index) => (
-                  <button
-                    key={`${skin.markethashname}-${index}`}
-                    onClick={() => handleSkinSelect(skin)}
-                    className="w-full p-3 text-left hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h4 className="font-medium text-sm">
-                          {skin.markethashname}
-                        </h4>
-                        <p className="text-xs text-muted-foreground capitalized">
-                          <span className="capitalize">{skin.itemgroup}</span> •{' '}
-                          <span className="uppercase">{skin.itemtype}</span>
-                        </p>
+              <div className="h-full overflow-y-auto">
+                <div className="grid grid-cols-1 divide-y">
+                  {filteredSkins.map((skin, index) => (
+                    <button
+                      key={`${skin.markethashname}-${index}`}
+                      onClick={() => handleSkinSelect(skin)}
+                      className="group w-full p-4 text-left hover:bg-muted/50 transition-all duration-200 hover:scale-[1.01]"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-medium text-sm group-hover:text-primary transition-colors truncate">
+                            {skin.markethashname}
+                          </h4>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Badge
+                              variant="outline"
+                              className="text-xs capitalize"
+                            >
+                              {skin.itemgroup}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground uppercase font-mono">
+                              {skin.itemtype}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center ml-4">
+                          <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                        </div>
                       </div>
-                      <Badge variant="outline" className="text-xs">
-                        Selecionar
-                      </Badge>
-                    </div>
-                  </button>
-                ))}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
           </div>
 
-          {/* Dica de uso */}
-          <div className="text-xs text-muted-foreground bg-muted/30 p-3 rounded-lg">
-            💡 <strong>Dica:</strong> Use os filtros para encontrar a skin
-            desejada mais rapidamente. A busca é feita em tempo real conforme
-            você digita.
+          {/* Footer com Dica */}
+          <div className="px-4 py-3 border-t bg-muted/20 shrink-0">
+            <div className="text-xs text-muted-foreground flex items-start gap-2">
+              <span className="text-primary">💡</span>
+              <div>
+                <span className="font-medium">Dica:</span> Use os filtros para
+                encontrar a skin desejada mais rapidamente. A busca funciona em
+                tempo real conforme você digita.
+              </div>
+            </div>
           </div>
         </div>
       </DialogContent>
@@ -309,7 +400,7 @@ export function SkinRequestButton({
 }: Omit<SkinRequestModalProps, 'children'>) {
   return (
     <SkinRequestModal skins={skins} onSkinSelect={onSkinSelect}>
-      <Button size="lg" className="w-full">
+      <Button size="lg" className="w-full text-white">
         <Package className="mr-2 h-5 w-5" />
         Solicitar Skin
       </Button>
