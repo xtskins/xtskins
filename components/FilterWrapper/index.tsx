@@ -4,6 +4,7 @@
 import { FilterProvider } from '@/context/FilterContext'
 import { Skin } from '@/lib/types/skin'
 import { Suspense } from 'react'
+import { Loader2 } from 'lucide-react'
 
 interface FilterWrapperProps {
   children: React.ReactNode
@@ -17,7 +18,13 @@ function FilterProviderWithParams({ children, skins }: FilterWrapperProps) {
 
 export function FilterWrapper({ children, skins }: FilterWrapperProps) {
   return (
-    <Suspense fallback={<div className="p-4">Carregando filtros...</div>}>
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center p-4">
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        </div>
+      }
+    >
       <FilterProviderWithParams skins={skins}>
         {children}
       </FilterProviderWithParams>
