@@ -70,7 +70,15 @@ function AdminPageContent() {
         <div className="z-10 flex h-full w-full max-w-7xl flex-col">
           <div className="mb-6 space-y-3">
             <div className="flex flex-col space-y-3 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
-              <h2 className="text-base font-bold">Painel de Administração</h2>
+              <div className="min-w-0 flex-1">
+                <h1 className="text-base font-bold truncate">
+                  Painel de Administração
+                </h1>
+                <p className="text-muted-foreground text-sm">
+                  Gerencie suas skins, edite o preço e a visibilidade de cada
+                  uma.
+                </p>
+              </div>
               <div className="flex flex-col space-y-2 lg:flex-row lg:items-center lg:gap-4 lg:space-y-0">
                 <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                   <Skeleton className="h-2 w-2 rounded-full" />
@@ -140,7 +148,15 @@ function AdminPageContent() {
         <div className="bg-background relative flex w-full flex-col items-center overflow-hidden p-4">
           <div className="z-10 flex h-full w-full max-w-7xl flex-col items-center justify-center min-h-[50vh]">
             <div className="text-center space-y-4">
-              <h2 className="text-base font-bold">Painel de Administração</h2>
+              <div className="min-w-0 flex-1">
+                <h1 className="text-base font-bold truncate">
+                  Painel de Administração
+                </h1>
+                <p className="text-muted-foreground text-sm">
+                  Gerencie suas skins, edite o preço e a visibilidade de cada
+                  uma.
+                </p>
+              </div>
               <p className="text-gray-600 dark:text-gray-400">
                 Configuração Steam necessária para acessar o painel
               </p>
@@ -163,7 +179,15 @@ function AdminPageContent() {
         <div className="z-10 flex h-full w-full max-w-7xl flex-col">
           <div className="mb-6 space-y-3">
             <div className="flex flex-col space-y-3 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
-              <h2 className="text-base font-bold">Painel de Administração</h2>
+              <div className="min-w-0 flex-1">
+                <h1 className="text-base font-bold truncate">
+                  Painel de Administração
+                </h1>
+                <p className="text-muted-foreground text-sm">
+                  Gerencie suas skins, edite o preço e a visibilidade de cada
+                  uma.
+                </p>
+              </div>
               <div className="flex flex-col space-y-2 lg:flex-row lg:items-center lg:gap-4 lg:space-y-0">
                 <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                   <StatusDot color="bg-green-500" />
@@ -212,7 +236,14 @@ function AdminPageContent() {
       <div className="z-10 flex h-full w-full max-w-7xl flex-col">
         <div className="mb-6 space-y-3">
           <div className="flex flex-col space-y-3 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
-            <h2 className="text-base font-bold">Painel de Administração</h2>
+            <div className="min-w-0 flex-1">
+              <h1 className="text-base font-bold truncate">
+                Painel de Administração
+              </h1>
+              <p className="text-muted-foreground text-sm">
+                Gerencie suas skins, edite o preço e a visibilidade de cada uma.
+              </p>
+            </div>
             <div className="flex flex-col space-y-2 lg:flex-row lg:items-center lg:gap-4 lg:space-y-0">
               <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                 <StatusDot color="bg-green-500" />
@@ -296,7 +327,15 @@ export default function AdminPage() {
         <div className="z-10 flex h-full w-full max-w-7xl flex-col">
           <div className="mb-6 space-y-3">
             <div className="flex flex-col space-y-3 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
-              <h2 className="text-base font-bold">Painel de Administração</h2>
+              <div className="min-w-0 flex-1">
+                <h1 className="text-base font-bold truncate">
+                  Painel de Administração
+                </h1>
+                <p className="text-muted-foreground text-sm">
+                  Gerencie suas skins, edite o preço e a visibilidade de cada
+                  uma.
+                </p>
+              </div>
               <div className="flex flex-col space-y-2 lg:flex-row lg:items-center lg:gap-4 lg:space-y-0">
                 <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                   <Skeleton className="h-2 w-2 rounded-full" />

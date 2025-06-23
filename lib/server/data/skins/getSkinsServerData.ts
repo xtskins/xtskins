@@ -63,7 +63,6 @@ export async function getAllSkinsServerData() {
       .from('skins')
       .select('*')
       .eq('is_visible', true)
-      .order('created_at', { ascending: false })
 
     if (error) {
       console.error('Erro no banco:', error)
@@ -90,7 +89,14 @@ export async function getAllSkinsServerData() {
       }
     }
 
-    return { skins: validatedSkins }
+    // Ordena por preço (maior para menor) - mesma lógica do FilterContext
+    const sortedSkins = validatedSkins.sort((a, b) => {
+      const priceA = parseFloat(a.discount_price || a.price || '0')
+      const priceB = parseFloat(b.discount_price || b.price || '0')
+      return priceB - priceA // Ordem decrescente (maior para menor)
+    })
+
+    return { skins: sortedSkins }
   } catch (error) {
     console.error('Erro ao buscar todas as skins no servidor:', error)
     return { skins: [] }

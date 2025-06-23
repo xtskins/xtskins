@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { Frame, Instagram } from 'lucide-react'
+import { Frame, Instagram, Package } from 'lucide-react'
 import { AK47Icon } from '@/components/icons/AK47Icon'
 
 import { NavMain } from '@/components/NavMain'
@@ -27,6 +27,10 @@ import { USPIcon } from '../icons/USPIcon'
 import { MP9Icon } from '../icons/MP9Icon'
 import { AWPIcon } from '../icons/AWPIcon'
 import { MachineIcon } from '../icons/MachineIcon'
+import { StickerIcon } from '../icons/StickerIcon'
+import { AgentIcon } from '../icons/AgentIcon'
+import { ShotgunIcon } from '../icons/ShotgunIcon'
+import { KnifeIcon } from '../icons/KnifeIcon'
 
 interface ServerUserData {
   user: SupabaseUser | null
@@ -52,6 +56,14 @@ const getIconForType = (type: string) => {
       return MP9Icon
     case 'sniper rifle':
       return AWPIcon
+    case `sticker`:
+      return StickerIcon
+    case `agent`:
+      return AgentIcon
+    case `shotgun`:
+      return ShotgunIcon
+    case `knife`:
+      return KnifeIcon
     default:
       return Frame
   }
@@ -88,6 +100,12 @@ const data = {
       url: 'https://www.instagram.com/xtskins/',
       icon: Instagram,
       target: '_blank',
+    },
+    {
+      name: 'Solicitar Skin',
+      url: '/solicitar-skin',
+      icon: Package,
+      target: '_self',
     },
   ],
 }

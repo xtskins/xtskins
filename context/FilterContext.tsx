@@ -168,10 +168,12 @@ export function FilterProvider({
   }, [searchParams])
 
   const filteredSkins = useMemo(() => {
+    // As skins já vêm ordenadas por preço do servidor
     if (!filterState.selectedType && !filterState.selectedSubType) {
       return skins
     }
 
+    // Aplicar filtros mantendo a ordenação original por preço
     return skins.filter((skin) => {
       const typeMatch =
         !filterState.selectedType ||

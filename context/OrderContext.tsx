@@ -2,6 +2,8 @@
 
 import { createContext, useContext, useState, useMemo, useEffect } from 'react'
 import { Skin } from '@/lib/types/skin'
+import { useOrderActions } from '@/hooks/useOrders'
+import { CreateOrderInput } from '@/lib/types/order'
 
 interface SkinCartItem extends Skin {
   addedAt: Date
@@ -22,6 +24,8 @@ interface OrderContextType {
   clearCart: () => void
   isInCart: (skinId: string) => boolean
   getCartItem: (skinId: string) => SkinCartItem | undefined
+  createOrder: (couponCode?: string) => Promise<void>
+  isCreatingOrder: boolean
 }
 
 const OrderContext = createContext<OrderContextType | undefined>(undefined)
@@ -32,6 +36,8 @@ interface OrderProviderProps {
 
 export function OrderProvider({ children }: OrderProviderProps) {
   const [items, setItems] = useState<SkinCartItem[]>([])
+  const { createOrder: createOrderApi, isCreating: isCreatingOrder } =
+    useOrderActions()
 
   // Carregar itens do localStorage na inicialização
   useEffect(() => {
@@ -95,6 +101,29 @@ export function OrderProvider({ children }: OrderProviderProps) {
     return items.find((item) => item.id === skinId)
   }
 
+  const createOrder = async (couponCode?: string) => {
+    if (items.length === 0) {
+      throw new Error('Carrinho está vazio')
+    }
+
+    const orderData: CreateOrderInput = {
+      items: items.map((item) => ({
+        skin_id: item.id,
+        quantity: 1, // Por enquanto sempre 1, mas pode ser expandido
+      })),
+      coupon_code: couponCode,
+    }
+
+    try {
+      await createOrderApi(orderData)
+      // Limpar carrinho após pedido bem-sucedido
+      clearCart()
+    } catch (error) {
+      console.error('Erro ao criar pedido:', error)
+      throw error
+    }
+  }
+
   const orderState = useMemo(() => {
     const totalItems = items.length
 
@@ -126,6 +155,8 @@ export function OrderProvider({ children }: OrderProviderProps) {
     clearCart,
     isInCart,
     getCartItem,
+    createOrder,
+    isCreatingOrder,
   }
 
   return <OrderContext.Provider value={value}>{children}</OrderContext.Provider>

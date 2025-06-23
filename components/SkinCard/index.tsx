@@ -19,6 +19,9 @@ import { motion } from 'framer-motion'
 import Image from 'next/image'
 import { useOrder } from '@/context/OrderContext'
 import { Skin } from '@/lib/types/skin'
+import { DotPattern } from '@/components/ui/dot-pattern'
+import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
 
 interface SkinCardProps {
   skinData: Skin
@@ -31,8 +34,10 @@ export default function SkinCard({ skinData }: SkinCardProps) {
   const handleCartAction = () => {
     if (inCart) {
       removeFromCart(skinData.id)
+      toast.info('Removido do carrinho')
     } else {
       addToCart(skinData)
+      toast.success('Adicionado ao carrinho')
     }
   }
 
@@ -46,6 +51,11 @@ export default function SkinCard({ skinData }: SkinCardProps) {
           !skinData.is_visible ? 'hidden' : ''
         }`}
       >
+        <DotPattern
+          className={cn(
+            'opacity-100 [mask-image:radial-gradient(150px_circle_at_50%_30%,white,transparent)]',
+          )}
+        />
         {skinData.tradable ? (
           <div className="absolute left-0 top-0 flex items-center gap-2 rounded-md bg-green-500 px-2 py-1 text-xs font-bold text-white">
             <CheckCircleIcon size={16} />

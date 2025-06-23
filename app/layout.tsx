@@ -24,6 +24,7 @@ import { getUserServerData } from '@/lib/server/data/user/getUserServerData'
 import { getCachedSkinsForLayout } from '@/lib/server/cache/skins-cache'
 import { getSidebarState } from '@/lib/utils/cookies'
 import { StructuredData } from '@/components/StructuredData'
+import { Toaster } from 'sonner'
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -155,6 +156,7 @@ export default async function RootLayout({
             </AuthProvider>
           </ThemeProvider>
         </TanstackProvider>
+        <Toaster richColors />
       </body>
     </html>
   )

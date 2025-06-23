@@ -108,7 +108,7 @@ export default function UpdateInventoryDialog() {
 
       {/* Dialog */}
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="w-[85%] sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center space-x-2">
               <Package className="w-5 h-5" />

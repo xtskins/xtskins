@@ -1,6 +1,6 @@
 'use client'
 
-import { UserLock } from 'lucide-react'
+import { Package2, UserLock, Ticket } from 'lucide-react'
 import { Button } from '../ui/button'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
@@ -75,6 +75,18 @@ export default function AdminArea({
             >
               <UserLock className="h-4 w-4 text-white" /> Acessar
             </Button>
+            <Button
+              className="bg-primary mt-2 w-full text-white"
+              onClick={() => router.push('/admin/pedidos')}
+            >
+              <Package2 className="h-4 w-4 text-white" /> Pedidos
+            </Button>
+            <Button
+              className="bg-primary mt-2 w-full text-white"
+              onClick={() => router.push('/admin/cupons')}
+            >
+              <Ticket className="h-4 w-4 text-white" /> Cupons
+            </Button>
           </div>
         </div>
 
@@ -88,10 +100,30 @@ export default function AdminArea({
             <UserLock className="h-4 w-4 text-white" />
           </Button>
         </div>
+        <div className="hidden group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9"
+            onClick={() => router.push('/admin/pedidos')}
+          >
+            <Package2 className="h-4 w-4 text-white" />
+          </Button>
+        </div>
+        <div className="hidden group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9"
+            onClick={() => router.push('/admin/cupons')}
+          >
+            <Ticket className="h-4 w-4 text-white" />
+          </Button>
+        </div>
       </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[425px] w-[80%]">
+        <DialogContent className="sm:max-w-[425px] w-[85%]">
           <DialogHeader>
             <DialogTitle>Steam ID Necessário</DialogTitle>
             <DialogDescription>

@@ -1,6 +1,7 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { ApiResponse, Skin, skinSchema } from '@/lib/types/skin'
+import { orderSchema, ApiResponse, Order } from '@/lib/types/order'
 
+// GET - Buscar pedidos do usuário
 export async function GET(req: Request): Promise<Response> {
   try {
     const accessToken = req.headers.get('authorization')?.replace('Bearer ', '')
@@ -35,40 +36,43 @@ export async function GET(req: Request): Promise<Response> {
       )
     }
 
-    // Verificar se o usuário é admin
-    const { data: userProfile, error: profileError } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', userData.user.id)
-      .single()
-
-    if (profileError || !userProfile || userProfile.role !== 'admin') {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: {
-            message:
-              'Acesso negado. Apenas administradores podem acessar esta rota',
-            code: 'FORBIDDEN',
-          },
-        }),
-        { status: 403, headers: { 'Content-Type': 'application/json' } },
+    // Buscar pedidos do usuário
+    const { data: orders, error: ordersError } = await supabase
+      .from('orders')
+      .select(
+        `
+        *,
+        order_items (
+          *,
+          skin:skins (
+            id,
+            markethashname,
+            image,
+            wear,
+            discount_price,
+            price,
+            tradable,
+            isstattrak,
+            issouvenir
+          )
+        ),
+        customer:users (
+          id,
+          email,
+          name
+        )
+      `,
       )
-    }
-
-    // Buscar todas as skins do administrador (visíveis e não visíveis)
-    const { data, error } = await supabase
-      .from('skins')
-      .select('*')
       .eq('user_id', userData.user.id)
+      .order('created_at', { ascending: false })
 
-    if (error) {
-      console.error('Erro no banco:', error)
+    if (ordersError) {
+      console.error('Erro ao buscar pedidos:', ordersError)
       return new Response(
         JSON.stringify({
           success: false,
           error: {
-            message: 'Erro ao buscar skins do administrador',
+            message: 'Erro ao buscar pedidos',
             code: 'DATABASE_ERROR',
           },
         }),
@@ -76,19 +80,27 @@ export async function GET(req: Request): Promise<Response> {
       )
     }
 
-    // Validar cada skin usando o schema
-    const validatedSkins = data.map((skin) => skinSchema.parse(skin))
+    // Transformar dados para o formato esperado
+    const transformedOrders = orders.map((order) => ({
+      ...order,
+      items: order.order_items.map((item: Record<string, unknown>) => ({
+        ...item,
+        skin: item.skin,
+      })),
+    }))
 
-    // Ordenar por preço (maior para menor) - mesma lógica dos outros endpoints
-    const sortedSkins = validatedSkins.sort((a, b) => {
-      const priceA = parseFloat(a.discount_price || a.price || '0')
-      const priceB = parseFloat(b.discount_price || b.price || '0')
-      return priceB - priceA // Ordem decrescente (maior para menor)
+    // Remover order_items já que foi transformado em items
+    transformedOrders.forEach((order) => {
+      delete (order as Record<string, unknown>).order_items
     })
 
-    const result: ApiResponse<Skin[]> = {
+    const validatedOrders = transformedOrders.map((order) =>
+      orderSchema.parse(order),
+    )
+
+    const result: ApiResponse<Order[]> = {
       success: true,
-      data: sortedSkins,
+      data: validatedOrders,
     }
 
     return new Response(JSON.stringify(result), {
@@ -96,7 +108,8 @@ export async function GET(req: Request): Promise<Response> {
       headers: { 'Content-Type': 'application/json' },
     })
   } catch (error) {
-    console.error('Erro interno:', error)
+    console.error('Erro ao buscar pedidos do usuário:', error)
+
     return new Response(
       JSON.stringify({
         success: false,
@@ -105,10 +118,7 @@ export async function GET(req: Request): Promise<Response> {
           code: 'INTERNAL_ERROR',
         },
       }),
-      {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' },
-      },
+      { status: 500, headers: { 'Content-Type': 'application/json' } },
     )
   }
 }
