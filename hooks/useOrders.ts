@@ -78,10 +78,12 @@ export function useOrderActions() {
     mutationFn: ({
       couponCode,
       orderAmount,
+      recaptchaToken,
     }: {
       couponCode: string
       orderAmount?: number
-    }) => orderApi.validateCoupon(couponCode, orderAmount),
+      recaptchaToken?: string
+    }) => orderApi.validateCoupon(couponCode, orderAmount, recaptchaToken),
   })
 
   return {

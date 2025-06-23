@@ -91,7 +91,7 @@ const data = {
   projects: [
     {
       name: 'WhatsApp',
-      url: 'https://wa.link/8doymn',
+      url: 'https://wa.link/f2um94',
       icon: WhatsappIcon,
       target: '_blank',
     },

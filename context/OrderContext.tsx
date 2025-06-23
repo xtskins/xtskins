@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useMemo, useEffect } from 'react'
 import { Skin } from '@/lib/types/skin'
 import { useOrderActions } from '@/hooks/useOrders'
+import { useRecaptcha } from '@/hooks/useRecaptcha'
 import { CreateOrderInput } from '@/lib/types/order'
 
 interface SkinCartItem extends Skin {
@@ -38,6 +39,7 @@ export function OrderProvider({ children }: OrderProviderProps) {
   const [items, setItems] = useState<SkinCartItem[]>([])
   const { createOrder: createOrderApi, isCreating: isCreatingOrder } =
     useOrderActions()
+  const { executeRecaptchaAction } = useRecaptcha()
 
   // Carregar itens do localStorage na inicialização
   useEffect(() => {
@@ -106,15 +108,19 @@ export function OrderProvider({ children }: OrderProviderProps) {
       throw new Error('Carrinho está vazio')
     }
 
-    const orderData: CreateOrderInput = {
-      items: items.map((item) => ({
-        skin_id: item.id,
-        quantity: 1, // Por enquanto sempre 1, mas pode ser expandido
-      })),
-      coupon_code: couponCode,
-    }
-
     try {
+      // Gerar token reCAPTCHA antes de criar o pedido
+      const recaptchaToken = await executeRecaptchaAction('create_order')
+
+      const orderData: CreateOrderInput = {
+        items: items.map((item) => ({
+          skin_id: item.id,
+          quantity: 1, // Por enquanto sempre 1, mas pode ser expandido
+        })),
+        coupon_code: couponCode,
+        recaptcha_token: recaptchaToken,
+      }
+
       await createOrderApi(orderData)
       // Limpar carrinho após pedido bem-sucedido
       clearCart()

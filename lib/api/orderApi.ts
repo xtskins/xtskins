@@ -140,6 +140,7 @@ export const orderApi = {
   async validateCoupon(
     couponCode: string,
     orderAmount?: number,
+    recaptchaToken?: string,
   ): Promise<
     ApiResponse<{
       coupon_id: string
@@ -160,6 +161,7 @@ export const orderApi = {
       body: JSON.stringify({
         couponCode,
         orderAmount: orderAmount || 0,
+        recaptcha_token: recaptchaToken,
       }),
     })
 

@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { useOrder } from '@/context/OrderContext'
 import { useAuth } from '@/context/AuthContext'
 import { useOrderActions } from '@/hooks/useOrders'
+import { useRecaptcha } from '@/hooks/useRecaptcha'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -47,6 +48,7 @@ export function CartButton({ onClick }: CartButtonProps) {
   } = useOrder()
   const { user, signInWithGoogle } = useAuth()
   const { validateCoupon } = useOrderActions()
+  const { executeRecaptchaAction } = useRecaptcha()
   const [couponCode, setCouponCode] = useState('')
   const [appliedCoupon, setAppliedCoupon] = useState<{
     code: string
@@ -66,12 +68,10 @@ export function CartButton({ onClick }: CartButtonProps) {
   const handleValidateCoupon = async () => {
     if (!couponCode.trim()) return
 
-    // Verificar se o usuário está logado antes de validar cupom
     if (!user) {
       toast.info('Você precisa estar logado para aplicar cupom')
-      // Primeiro fechar o carrinho
       setIsSheetOpen(false)
-      // Aguardar um pouco para dar tempo da animação de fechamento
+
       setTimeout(() => {
         setAuthReason('coupon')
         setShowAuthDialog(true)
@@ -82,9 +82,12 @@ export function CartButton({ onClick }: CartButtonProps) {
     setIsValidatingCoupon(true)
 
     try {
+      const recaptchaToken = await executeRecaptchaAction('validate_coupon')
+
       const result = await validateCoupon({
         couponCode,
         orderAmount: orderState.totalValue,
+        recaptchaToken,
       })
 
       if (result.data) {
@@ -111,11 +114,8 @@ export function CartButton({ onClick }: CartButtonProps) {
   }
 
   const handleCreateOrder = async () => {
-    // Verificar se o usuário está autenticado
     if (!user) {
-      // Primeiro fechar o carrinho
       setIsSheetOpen(false)
-      // Aguardar um pouco para dar tempo da animação de fechamento
       setTimeout(() => {
         setAuthReason('purchase')
         setShowAuthDialog(true)
@@ -126,15 +126,55 @@ export function CartButton({ onClick }: CartButtonProps) {
     try {
       await createOrder(appliedCoupon?.code)
       toast.success('Pedido criado com sucesso!')
+
+      openWhatsAppMessage()
+
+      setIsSheetOpen(false)
     } catch (error) {
       toast.error('Erro ao criar pedido: ' + (error as Error).message)
     }
   }
 
+  const openWhatsAppMessage = () => {
+    const whatsappNumber = '353870015714'
+
+    const itemsList = orderState.items
+      .map(
+        (item, index) =>
+          `${index + 1}. ${item.marketname} - R$ ${parseFloat(item.discount_price).toFixed(2)}`,
+      )
+      .join('\n')
+
+    const subtotal = orderState.totalValue
+    const desconto =
+      orderState.totalDiscount + (appliedCoupon?.discount_amount || 0)
+    const total = finalPrice
+
+    const message = `Olá! 👋
+
+Acabei de fazer uma compra no site e gostaria de saber os próximos passos.
+
+📋 *Detalhes do Pedido:*
+${itemsList}
+
+💰 *Resumo Financeiro:*
+• Subtotal: R$ ${subtotal.toFixed(2)}
+${desconto > 0 ? `• Desconto: -R$ ${desconto.toFixed(2)}\n` : ''}• *Total: R$ ${total.toFixed(2)}*
+
+${appliedCoupon ? `🎫 Cupom aplicado: ${appliedCoupon.code}\n` : ''}
+Aguardo instruções sobre como proceder com o pagamento e entrega.
+
+Obrigado! 😊`
+
+    const encodedMessage = encodeURIComponent(message)
+    const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodedMessage}`
+
+    window.open(whatsappUrl, '_blank', 'noopener,noreferrer')
+  }
+
   const handleLoginAndContinue = async () => {
     try {
       await signInWithGoogle()
-      // O usuário será redirecionado para login
       setShowAuthDialog(false)
     } catch (error) {
       console.error('Erro ao fazer login:', error)
@@ -142,7 +182,6 @@ export function CartButton({ onClick }: CartButtonProps) {
     }
   }
 
-  // Calcular desconto do cupom
   const discountAmount = appliedCoupon?.discount_amount || 0
 
   const finalPrice = orderState.totalValue - discountAmount
@@ -351,7 +390,6 @@ export function CartButton({ onClick }: CartButtonProps) {
                   </dd>
                 </div>
 
-                {/* Resumo da economia total */}
                 {(orderState.totalDiscount > 0 || appliedCoupon) && (
                   <div className="mt-2 p-2 rounded-md bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800">
                     <p className="text-xs text-green-600 dark:text-green-400 text-center">
@@ -377,26 +415,47 @@ export function CartButton({ onClick }: CartButtonProps) {
                 >
                   Limpar Carrinho
                 </Button>
+
+                <p className="text-xs text-muted-foreground text-center px-2">
+                  Este site é protegido pelo reCAPTCHA e as{' '}
+                  <a
+                    href="https://policies.google.com/privacy"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary underline hover:no-underline"
+                  >
+                    Políticas de Privacidade
+                  </a>{' '}
+                  e{' '}
+                  <a
+                    href="https://policies.google.com/terms"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary underline hover:no-underline"
+                  >
+                    Termos de Serviço
+                  </a>{' '}
+                  do Google se aplicam.
+                </p>
               </div>
             </div>
           )}
         </SheetContent>
       </Sheet>
 
-      {/* Dialog de Autenticação */}
       <Dialog open={showAuthDialog} onOpenChange={setShowAuthDialog}>
-        <DialogContent className="w-[85%] sm:max-w-md">
-          <DialogHeader className="text-center space-y-4">
-            <div className="mx-auto w-16 h-16 bg-gradient-to-br from-primary/20 to-primary/10 rounded-full flex items-center justify-center">
-              <div className="w-12 h-12 bg-gradient-to-br from-primary to-primary/80 rounded-full flex items-center justify-center">
-                <User className="h-6 w-6 text-white" />
+        <DialogContent className="w-[90%] max-w-sm sm:max-w-md mx-auto">
+          <DialogHeader className="text-center space-y-3">
+            <div className="mx-auto w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br from-primary/20 to-primary/10 rounded-full flex items-center justify-center">
+              <div className="w-8 h-8 sm:w-12 sm:h-12 bg-gradient-to-br from-primary to-primary/80 rounded-full flex items-center justify-center">
+                <User className="h-4 w-4 sm:h-6 sm:w-6 text-white" />
               </div>
             </div>
-            <div className="space-y-2">
-              <DialogTitle className="text-xl font-semibold">
+            <div className="space-y-1">
+              <DialogTitle className="text-lg sm:text-xl font-semibold text-center">
                 Faça Login para Continuar
               </DialogTitle>
-              <DialogDescription className="text-sm">
+              <DialogDescription className="text-xs sm:text-sm px-2">
                 {authReason === 'coupon'
                   ? 'Entre com sua conta Google para aplicar cupons e aproveitar descontos especiais'
                   : 'Entre com sua conta Google para finalizar a compra das suas skins favoritas'}
@@ -404,37 +463,35 @@ export function CartButton({ onClick }: CartButtonProps) {
             </div>
           </DialogHeader>
 
-          <div className="py-6">
-            {/* Resumo do Carrinho */}
-            <div className="bg-gradient-to-r from-muted/40 to-muted/20 rounded-xl p-6 border border-border/50">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
-                    <ShoppingCart className="h-5 w-5 text-primary" />
+          <div className="py-4">
+            <div className="bg-gradient-to-r from-muted/40 to-muted/20 rounded-xl p-3 sm:p-4 border border-border/50">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
                   </div>
-                  <div>
-                    <p className="font-medium text-sm">Seu Carrinho</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-xs sm:text-sm truncate">
+                      Seu Carrinho
+                    </p>
                     <p className="text-xs text-muted-foreground">
                       {orderState.totalItems}{' '}
-                      {orderState.totalItems === 1
-                        ? 'item selecionado'
-                        : 'itens selecionados'}
+                      {orderState.totalItems === 1 ? 'item' : 'itens'}
                     </p>
                   </div>
                 </div>
-                <div className="text-right">
+                <div className="text-right flex-shrink-0">
                   <p className="text-xs text-muted-foreground">Total</p>
-                  <p className="text-lg font-bold text-green-500">
+                  <p className="text-sm sm:text-lg font-bold text-green-500">
                     R$ {finalPrice.toFixed(2)}
                   </p>
                 </div>
               </div>
 
-              {/* Economia */}
               {(orderState.totalDiscount > 0 || appliedCoupon) && (
-                <div className="flex items-center justify-center gap-2 py-2 px-3 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-800">
+                <div className="mt-2 flex items-center justify-center gap-1 py-1.5 px-2 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-800">
                   <span className="text-xs">💰</span>
-                  <p className="text-xs text-green-600 dark:text-green-400 font-medium">
+                  <p className="text-xs text-green-600 dark:text-green-400 font-medium text-center">
                     Economia de R${' '}
                     {(
                       orderState.totalDiscount +
@@ -448,21 +505,45 @@ export function CartButton({ onClick }: CartButtonProps) {
             </div>
           </div>
 
-          <DialogFooter className="flex gap-3 sm:gap-3">
-            <Button
-              variant="outline"
-              onClick={() => setShowAuthDialog(false)}
-              className="flex-1"
-            >
-              Continuar Navegando
-            </Button>
-            <Button
-              onClick={handleLoginAndContinue}
-              className="flex-1 bg-gradient-to-r from-primary to-primary/90 text-white hover:from-primary/90 hover:to-primary/80 shadow-lg"
-            >
-              <LogIn className="h-4 w-4 mr-2" />
-              {authReason === 'coupon' ? 'Fazer Login' : 'Entrar com Google'}
-            </Button>
+          <DialogFooter className="!flex !flex-col gap-2 sm:gap-3">
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setShowAuthDialog(false)}
+                className="flex-1 text-sm"
+              >
+                Continuar Navegando
+              </Button>
+              <Button
+                onClick={handleLoginAndContinue}
+                className="flex-1 bg-gradient-to-r from-primary to-primary/90 text-white hover:from-primary/90 hover:to-primary/80 shadow-lg text-sm"
+              >
+                <LogIn className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                {authReason === 'coupon' ? 'Fazer Login' : 'Entrar com Google'}
+              </Button>
+            </div>
+
+            <p className="text-xs text-muted-foreground text-center px-1 leading-tight">
+              Este site é protegido pelo reCAPTCHA e as{' '}
+              <a
+                href="https://policies.google.com/privacy"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary underline hover:no-underline"
+              >
+                Políticas de Privacidade
+              </a>{' '}
+              e{' '}
+              <a
+                href="https://policies.google.com/terms"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary underline hover:no-underline"
+              >
+                Termos de Serviço
+              </a>{' '}
+              do Google se aplicam.
+            </p>
           </DialogFooter>
         </DialogContent>
       </Dialog>

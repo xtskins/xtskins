@@ -17,7 +17,6 @@ export function useWelcomeEmail({
   const emailSentRef = useRef(false)
 
   useEffect(() => {
-    // Função para enviar email de boas-vindas
     const handleWelcomeEmail = async () => {
       if (
         !user ||
@@ -29,34 +28,20 @@ export function useWelcomeEmail({
         return
       }
 
-      console.log('🔍 [WELCOME EMAIL] Verificando necessidade de envio para:', {
-        userId: user.id,
-        email: user.email,
-        name: profile.name,
-        welcomeEmailSent: profile.welcome_email_sent,
-      })
-
       try {
-        emailSentRef.current = true // Previne múltiplas execuções
+        emailSentRef.current = true
 
         await sendWelcomeEmail({
-          firstName: profile.name.split(' ')[0], // Primeiro nome
+          firstName: profile.name.split(' ')[0],
           email: user.email || '',
           isNewUser: !profile.welcome_email_sent,
         })
-
-        console.log(
-          '✅ [WELCOME EMAIL] Email enviado com sucesso para:',
-          user.email,
-        )
       } catch (error) {
-        console.error('❌ [WELCOME EMAIL] Erro ao enviar email:', error)
-        emailSentRef.current = false // Permite nova tentativa em caso de erro
+        console.error(error)
+        emailSentRef.current = false
       }
     }
 
-    // Aguardar 2 segundos após dados estarem prontos para enviar email
-    // Isso garante que a interface carregou completamente
     if (!loading && user && profile) {
       const timeoutId = setTimeout(() => {
         handleWelcomeEmail()
@@ -66,7 +51,6 @@ export function useWelcomeEmail({
     }
   }, [user, profile, loading])
 
-  // Reset da flag quando usuário deslogar
   useEffect(() => {
     if (!user) {
       emailSentRef.current = false

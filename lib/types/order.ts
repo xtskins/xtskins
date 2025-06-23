@@ -58,6 +58,7 @@ export const createOrderSchema = z.object({
     )
     .min(1, 'Pelo menos um item é necessário'),
   coupon_code: z.string().optional(),
+  recaptcha_token: z.string().min(1, 'Token reCAPTCHA é obrigatório'),
 })
 
 // Schema para atualização de status

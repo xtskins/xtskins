@@ -62,24 +62,13 @@ export default function UpdateInventoryDialog() {
 
   const handleUpdateInventory = async () => {
     try {
-      console.log('🔄 Iniciando atualização do inventário...')
-
-      // Primeiro atualiza o inventário
-      const inventoryResult = await syncInventoryMutation.mutateAsync({
+      await syncInventoryMutation.mutateAsync({
         forceRefresh: true,
       })
 
-      console.log('✅ Inventário atualizado:', inventoryResult)
-
-      // Se deu certo, atualiza o cache das skins também
-      console.log('🔄 Iniciando refresh do cache das skins...')
-      const cacheResult = await refreshCache()
-
-      console.log('✅ Cache das skins atualizado:', cacheResult)
-      console.log('🎉 Processo completo finalizado!')
+      await refreshCache()
     } catch (error) {
       console.error('❌ Erro no processo de atualização:', error)
-      // O erro já é tratado pelos hooks individuais
     }
   }
 
@@ -96,7 +85,6 @@ export default function UpdateInventoryDialog() {
 
   return (
     <>
-      {/* Botão simples */}
       <Button
         onClick={() => setIsOpen(true)}
         variant="outline"
@@ -106,7 +94,6 @@ export default function UpdateInventoryDialog() {
         <span>Atualizar Inventário</span>
       </Button>
 
-      {/* Dialog */}
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogContent className="w-[85%] sm:max-w-md">
           <DialogHeader>
@@ -120,7 +107,6 @@ export default function UpdateInventoryDialog() {
           </DialogHeader>
 
           <div className="space-y-4">
-            {/* Status atual */}
             <div className="flex items-center space-x-3 p-3 bg-gray-50 dark:bg-[#323232] rounded-lg">
               {isUpdating ? (
                 <LoadingDot color="bg-blue-500" />
@@ -134,7 +120,6 @@ export default function UpdateInventoryDialog() {
               <span className="text-sm font-medium">{getStatusText()}</span>
             </div>
 
-            {/* Progresso detalhado */}
             {isPending && (
               <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg p-3">
                 <div className="flex items-center space-x-3">
@@ -157,7 +142,6 @@ export default function UpdateInventoryDialog() {
               </div>
             )}
 
-            {/* Resultados */}
             {result?.success && (
               <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700 rounded-lg p-4">
                 <div className="flex items-center space-x-3 mb-3">
@@ -223,7 +207,6 @@ export default function UpdateInventoryDialog() {
               </div>
             )}
 
-            {/* Informações */}
             <div className="bg-gray-50 dark:bg-[#323232] rounded-lg p-3">
               <div className="flex items-center space-x-2 mb-3">
                 <Info className="w-4 h-4 text-gray-600 dark:text-gray-400" />
@@ -251,7 +234,6 @@ export default function UpdateInventoryDialog() {
               </div>
             </div>
 
-            {/* Botão de ação */}
             <div className="flex space-x-2">
               <Button
                 onClick={handleUpdateInventory}

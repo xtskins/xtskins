@@ -15,14 +15,26 @@ export default function SolicitarSkinPage() {
     itemgroup: string
     itemtype: string
   }) => {
-    console.log('Skin selecionada:', skin)
-    // Aqui você pode implementar a lógica depois
-    alert(`Skin selecionada: ${skin.markethashname}`)
+    openWhatsAppForSkinRequest(skin.markethashname)
+  }
+
+  const openWhatsAppForSkinRequest = (skinName: string) => {
+    const whatsappNumber = '353870015714'
+
+    const message = `Olá! 
+
+Gostaria de solicitar essa skin que não encontrei no site: ${skinName}
+
+Como poderia fazer?`
+
+    const encodedMessage = encodeURIComponent(message)
+    const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodedMessage}`
+
+    window.open(whatsappUrl, '_blank', 'noopener,noreferrer')
   }
 
   return (
     <div className="bg-background relative mb-[64px] flex h-[86%] w-full flex-col items-center overflow-hidden">
-      {/* Header com botão de voltar - posicionado absolutamente */}
       <div className="absolute top-4 left-4 z-30">
         <Link href="/">
           <Button variant="ghost" size="sm">
@@ -32,7 +44,6 @@ export default function SolicitarSkinPage() {
         </Link>
       </div>
 
-      {/* Conteúdo principal centralizado */}
       <div className="z-10 flex h-full flex-col justify-center max-md:min-h-[30dvh]">
         <div className="space-y-4 text-center">
           <h1 className="px-4 text-center text-3xl font-bold tracking-tighter text-black md:text-4xl lg:text-6xl dark:text-white">
@@ -43,12 +54,10 @@ export default function SolicitarSkinPage() {
         </div>
       </div>
 
-      {/* Botão principal de solicitar skin */}
       <div className="z-20 w-full max-w-md px-4">
         <SkinRequestButton skins={items} onSkinSelect={handleSkinSelect} />
       </div>
 
-      {/* Informações adicionais */}
       <div className="z-20 mt-6 text-center text-sm text-muted-foreground space-y-1">
         <p>
           <strong>{items.length}</strong> skins disponíveis

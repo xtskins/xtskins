@@ -24,6 +24,7 @@ import { getUserServerData } from '@/lib/server/data/user/getUserServerData'
 import { getCachedSkinsForLayout } from '@/lib/server/cache/skins-cache'
 import { getSidebarState } from '@/lib/utils/cookies'
 import { StructuredData } from '@/components/StructuredData'
+import { RecaptchaProvider } from '@/components/providers/RecaptchaProvider'
 import { Toaster } from 'sonner'
 
 const geistSans = Geist({
@@ -123,37 +124,39 @@ export default async function RootLayout({
       >
         <TanstackProvider>
           <ThemeProvider attribute="class" defaultTheme="dark">
-            <AuthProvider serverData={serverData}>
-              <OrderProvider>
-                <ServerDataProvider data={serverData}>
-                  <FilterWrapper skins={serverData.skins}>
-                    <SidebarProvider
-                      key="sidebar-provider"
-                      defaultOpen={sidebarOpen}
-                    >
-                      <AppSidebar serverUserData={serverData} />
-                      <SidebarInset>
-                        <header className="flex h-16 shrink-0 items-center justify-between gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
-                          <div className="flex items-center gap-2 px-4">
-                            <SidebarTrigger className="-ml-1" />
-                            <Separator
-                              orientation="vertical"
-                              className="mr-2 h-4"
-                            />
-                            <BreadcrumbNav />
-                          </div>
-                          <div className="flex items-center gap-2 px-4">
-                            <CartButton />
-                            <ThemeToggle />
-                          </div>
-                        </header>
-                        {children}
-                      </SidebarInset>
-                    </SidebarProvider>
-                  </FilterWrapper>
-                </ServerDataProvider>
-              </OrderProvider>
-            </AuthProvider>
+            <RecaptchaProvider>
+              <AuthProvider serverData={serverData}>
+                <OrderProvider>
+                  <ServerDataProvider data={serverData}>
+                    <FilterWrapper skins={serverData.skins}>
+                      <SidebarProvider
+                        key="sidebar-provider"
+                        defaultOpen={sidebarOpen}
+                      >
+                        <AppSidebar serverUserData={serverData} />
+                        <SidebarInset>
+                          <header className="flex h-16 shrink-0 items-center justify-between gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
+                            <div className="flex items-center gap-2 px-4">
+                              <SidebarTrigger className="-ml-1" />
+                              <Separator
+                                orientation="vertical"
+                                className="mr-2 h-4"
+                              />
+                              <BreadcrumbNav />
+                            </div>
+                            <div className="flex items-center gap-2 px-4">
+                              <CartButton />
+                              <ThemeToggle />
+                            </div>
+                          </header>
+                          {children}
+                        </SidebarInset>
+                      </SidebarProvider>
+                    </FilterWrapper>
+                  </ServerDataProvider>
+                </OrderProvider>
+              </AuthProvider>
+            </RecaptchaProvider>
           </ThemeProvider>
         </TanstackProvider>
         <Toaster richColors />
