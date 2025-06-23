@@ -146,6 +146,7 @@ export function AppSidebar({ serverUserData, ...props }: AppSidebarProps) {
               name: currentProfile.name,
               email: currentProfile.email,
               avatar_url: currentProfile.avatar_url || '',
+              level: currentProfile.level,
             }}
             loading={false}
           />

@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { User } from '@/lib/types/user'
 import { useUser } from '@/hooks/useUser'
+import { useWelcomeEmail } from '@/hooks/useWelcomeEmail'
 import { Skin, SkinType } from '@/lib/types/skin'
 
 interface ServerUserData {
@@ -44,6 +45,13 @@ export function AuthProvider({ children, serverData }: AuthProviderProps) {
 
   const { data: profile } = useUser(currentUser?.id, initialProfile)
 
+  // Hook para enviar email de boas-vindas para novos usuários
+  useWelcomeEmail({
+    user: currentUser,
+    profile: profile ?? null,
+    loading,
+  })
+
   useEffect(() => {
     if (serverData?.user) {
       setUser(serverData.user)
@@ -73,7 +81,7 @@ export function AuthProvider({ children, serverData }: AuthProviderProps) {
 
   const signOut = async () => {
     await supabase.auth.signOut()
-    router.push('/')
+    router.refresh()
   }
 
   const value = {

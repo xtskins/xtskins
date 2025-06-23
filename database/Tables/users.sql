@@ -13,6 +13,7 @@ create table public.users (
   role user_role default 'client',                       -- Role do usuário (client por padrão, admin para administradores)
   level text default 'Bronze',                           -- Nível do usuário (Bronze por padrão)
   steam_id text,                                         -- Steam ID do usuário (usado apenas para admins, pode ser nulo)
+  welcome_email_sent boolean default false,              -- Indica se o email de boas-vindas já foi enviado
   created_at timestamp with time zone default now()      -- Data de criação do registro
 ); 
 

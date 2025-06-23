@@ -9,6 +9,7 @@ export const userSchema = z.object({
   role: z.enum(['admin', 'client']),
   level: z.string(),
   steam_id: z.string().nullable(),
+  welcome_email_sent: z.boolean().default(false),
   created_at: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?([+-]\d{2}:\d{2}|Z)?$/)
