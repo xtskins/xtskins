@@ -20,8 +20,8 @@ export function FilterWrapper({ children, skins }: FilterWrapperProps) {
   return (
     <Suspense
       fallback={
-        <div className="flex items-center justify-center p-4">
-          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        <div className="fixed inset-0 flex items-center justify-center bg-background z-50">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       }
     >
