@@ -80,6 +80,22 @@ export function useSteamQRAuth() {
           }
         } catch (error) {
           console.error('Erro no polling:', error)
+
+          // Se foi erro de sessão não encontrada ou expirada, parar o polling
+          const errorMessage =
+            error instanceof Error ? error.message : String(error)
+          if (
+            errorMessage.includes('Sessão não encontrada') ||
+            errorMessage.includes('Sessão expirada')
+          ) {
+            clearInterval(interval)
+            setPollingInterval(null)
+            setState((prev) => ({
+              ...prev,
+              status: 'error',
+              message: errorMessage || 'Sessão expirada',
+            }))
+          }
         }
       }, 2000)
 

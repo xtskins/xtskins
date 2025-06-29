@@ -4,6 +4,9 @@ import { SteamAuthService } from '@/lib/steam/steam-auth-service'
 // Armazenar sessões temporariamente (em produção, considere usar Redis)
 const activeSessions = new Map<string, LoginSession>()
 
+// Armazenar timestamps de criação das sessões para timeout
+const sessionTimestamps = new Map<string, number>()
+
 // POST - Iniciar processo de autenticação Steam
 export async function POST(req: Request): Promise<Response> {
   try {
@@ -28,6 +31,7 @@ export async function POST(req: Request): Promise<Response> {
 
     // Armazenar sessão temporariamente
     activeSessions.set(sessionId, session)
+    sessionTimestamps.set(sessionId, Date.now())
 
     // Configurar evento de autenticação
     session.on('authenticated', async () => {
@@ -39,11 +43,13 @@ export async function POST(req: Request): Promise<Response> {
 
       // Limpar sessão após salvar
       activeSessions.delete(sessionId)
+      sessionTimestamps.delete(sessionId)
     })
 
     session.on('error', (error) => {
       console.error('Erro na autenticação Steam:', error)
       activeSessions.delete(sessionId)
+      sessionTimestamps.delete(sessionId)
     })
 
     // Iniciar processo de autenticação
@@ -97,14 +103,73 @@ export async function GET(req: Request): Promise<Response> {
     }
 
     const session = activeSessions.get(sessionId)
+    const sessionCreatedAt = sessionTimestamps.get(sessionId)
 
     if (!session) {
+      // Se não temos timestamp, significa que a sessão nunca existiu ou expirou
+      if (!sessionCreatedAt) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: {
+              message: 'Sessão não encontrada ou expirada',
+              code: 'SESSION_NOT_FOUND',
+            },
+          }),
+          { status: 404, headers: { 'Content-Type': 'application/json' } },
+        )
+      }
+
+      // Se a sessão foi criada há mais de 10 minutos, considerar expirada
+      const sessionAge = Date.now() - sessionCreatedAt
+      if (sessionAge > 10 * 60 * 1000) {
+        // 10 minutos
+        sessionTimestamps.delete(sessionId)
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: {
+              message: 'Sessão expirada',
+              code: 'SESSION_EXPIRED',
+            },
+          }),
+          { status: 410, headers: { 'Content-Type': 'application/json' } },
+        )
+      }
+
+      // Se chegou aqui, provavelmente é um problema de instâncias diferentes em produção
+      // Verificar se a autenticação já foi salva no banco
+      try {
+        const steamAuth = SteamAuthService.getInstance()
+        const refreshToken = await steamAuth.getRefreshToken(
+          req.headers.get('authorization')?.replace('Bearer ', '') || '',
+        )
+
+        if (refreshToken) {
+          // Autenticação foi concluída, limpar timestamp
+          sessionTimestamps.delete(sessionId)
+          return new Response(
+            JSON.stringify({
+              success: true,
+              data: {
+                status: 'completed',
+                authenticated: true,
+              },
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          )
+        }
+      } catch (error) {
+        console.error('Erro ao verificar refresh token:', error)
+      }
+
+      // Sessão ainda está pendente (provavelmente problema de instâncias)
       return new Response(
         JSON.stringify({
           success: true,
           data: {
-            status: 'completed', // Sessão não existe = já foi processada
-            authenticated: true,
+            status: 'pending',
+            authenticated: false,
           },
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
