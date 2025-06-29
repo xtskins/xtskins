@@ -165,7 +165,7 @@ export async function POST(req: Request): Promise<Response> {
     const registerResult = await registerSession(
       accessToken,
       sessionId,
-      qrChallengeUrl,
+      qrChallengeUrl!,
     )
     if (!registerResult.success) {
       return new Response(
