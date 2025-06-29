@@ -264,11 +264,16 @@ function startSessionPolling(accessToken: string, qrAuthData: SteamQRAuthData) {
 
   console.log('🔄 Iniciando polling da sessão Steam:', qrAuthData.sessionId)
 
-  // Configurar eventos da sessão Steam (funcionam em local, podem não funcionar em produção)
+  // Configurar APENAS eventos nativos - sem polling manual que causa problemas
   session.on('authenticated', async () => {
-    console.log('✅ Evento authenticated disparado:', qrAuthData.sessionId)
+    console.log('✅ EVENTO AUTHENTICATED disparado:', qrAuthData.sessionId)
     try {
       if (session.refreshToken) {
+        console.log(
+          '🔑 Refresh token obtido via evento:',
+          session.refreshToken.substring(0, 20) + '...',
+        )
+
         const steamAuth = SteamAuthService.getInstance()
         await steamAuth.saveRefreshToken(accessToken, session.refreshToken)
 
@@ -279,73 +284,39 @@ function startSessionPolling(accessToken: string, qrAuthData: SteamQRAuthData) {
           session.refreshToken,
         )
 
-        console.log('✅ Refresh token salvo via evento')
+        console.log('✅ Refresh token salvo com sucesso via evento')
       }
     } catch (error) {
       console.error('❌ Erro ao salvar refresh token via evento:', error)
+      await updateSessionStatus(accessToken, qrAuthData.sessionId, 'failed')
     } finally {
       activeSteamSessions.delete(qrAuthData.sessionId)
     }
   })
 
   session.on('error', async (error) => {
-    console.error('❌ Erro na sessão Steam:', error)
+    console.error('❌ ERRO na sessão Steam:', error)
     await updateSessionStatus(accessToken, qrAuthData.sessionId, 'failed')
     activeSteamSessions.delete(qrAuthData.sessionId)
   })
 
-  // Polling manual como fallback para produção
-  const pollInterval = setInterval(async () => {
-    try {
-      console.log(
-        '🔄 Verificando status da sessão Steam:',
-        qrAuthData.sessionId,
-      )
-
-      // Verificar se a sessão ainda existe
-      if (!activeSteamSessions.has(qrAuthData.sessionId)) {
-        console.log('❌ Sessão não encontrada na memória, parando polling')
-        clearInterval(pollInterval)
-        return
-      }
-
-      // Verificar se foi autenticada
-      if (session.refreshToken) {
-        console.log(
-          '✅ Refresh token detectado via polling:',
-          session.refreshToken,
-        )
-
-        const steamAuth = SteamAuthService.getInstance()
-        await steamAuth.saveRefreshToken(accessToken, session.refreshToken)
-
-        await updateSessionStatus(
-          accessToken,
-          qrAuthData.sessionId,
-          'completed',
-          session.refreshToken,
-        )
-
-        console.log('✅ Refresh token salvo via polling')
-        activeSteamSessions.delete(qrAuthData.sessionId)
-        clearInterval(pollInterval)
-      }
-    } catch (error) {
-      console.error('❌ Erro no polling manual:', error)
-    }
-  }, 3000) // Verificar a cada 3 segundos
-
-  // Timeout após 10 minutos
+  // Timeout de segurança (sem polling manual)
   setTimeout(
     () => {
       if (activeSteamSessions.has(qrAuthData.sessionId)) {
-        console.log('⏰ Timeout da sessão Steam:', qrAuthData.sessionId)
+        console.log(
+          '⏰ Timeout da sessão Steam (10 min):',
+          qrAuthData.sessionId,
+        )
         updateSessionStatus(accessToken, qrAuthData.sessionId, 'expired')
         activeSteamSessions.delete(qrAuthData.sessionId)
       }
-      clearInterval(pollInterval)
     },
     10 * 60 * 1000,
+  )
+
+  console.log(
+    '🎯 Sessão Steam configurada - aguardando evento authenticated...',
   )
 }
 
@@ -406,8 +377,16 @@ export async function GET(req: Request): Promise<Response> {
       )
     }
 
+    console.log('📊 Status da sessão no banco:', {
+      sessionId,
+      status: sessionStatus.status,
+      instanceId: INSTANCE_ID,
+      hasRefreshToken: !!sessionStatus.refreshToken,
+    })
+
     // Se a sessão foi concluída e tem refresh token
     if (sessionStatus.status === 'completed' && sessionStatus.refreshToken) {
+      console.log('✅ Sessão concluída com refresh token')
       return new Response(
         JSON.stringify({
           success: true,
@@ -429,6 +408,8 @@ export async function GET(req: Request): Promise<Response> {
           : sessionStatus.status === 'expired'
             ? 'expired'
             : 'pending'
+
+    console.log('📈 Retornando status:', status)
 
     if (status === 'failed' || status === 'expired') {
       return new Response(
