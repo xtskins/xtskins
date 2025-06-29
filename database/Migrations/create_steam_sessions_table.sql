@@ -6,6 +6,8 @@ CREATE TABLE IF NOT EXISTS steam_sessions (
   instance_id TEXT NOT NULL, -- Identificador único da instância do servidor
   status TEXT NOT NULL DEFAULT 'pending', -- pending, completed, failed, expired
   qr_url TEXT,
+  metadata JSONB, -- Dados da sessão Steam (client_id, request_id, etc)
+  refresh_token TEXT, -- Refresh token quando autenticação for concluída
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   expires_at TIMESTAMP WITH TIME ZONE DEFAULT (NOW() + INTERVAL '10 minutes')
@@ -44,4 +46,6 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 COMMENT ON TABLE steam_sessions IS 'Gerencia sessões Steam ativas com sistema de lock para produção';
 COMMENT ON COLUMN steam_sessions.session_id IS 'ID único da sessão Steam';
 COMMENT ON COLUMN steam_sessions.instance_id IS 'ID da instância do servidor que gerencia esta sessão';
-COMMENT ON COLUMN steam_sessions.status IS 'Status da sessão: pending, completed, failed, expired'; 
+COMMENT ON COLUMN steam_sessions.status IS 'Status da sessão: pending, completed, failed, expired';
+COMMENT ON COLUMN steam_sessions.metadata IS 'Dados da sessão Steam (client_id, request_id) armazenados como JSON';
+COMMENT ON COLUMN steam_sessions.refresh_token IS 'Refresh token Steam quando autenticação for concluída'; 

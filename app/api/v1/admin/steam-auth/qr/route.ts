@@ -3,39 +3,68 @@ import { SteamAuthService } from '@/lib/steam/steam-auth-service'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { randomUUID } from 'crypto'
 
-// Armazenar sessões apenas da instância atual
-const activeSessions = new Map<string, LoginSession>()
-
 // ID único desta instância do servidor
 const INSTANCE_ID = randomUUID()
+
+// Armazenar sessões Steam ativas apenas desta instância
+const activeSteamSessions = new Map<string, LoginSession>()
+
+// Interface para dados da sessão Steam
+interface SteamQRAuthData {
+  sessionId: string
+  qrUrl: string
+  steamSession: LoginSession
+}
 
 // Função para registrar sessão no banco
 async function registerSession(
   accessToken: string,
   sessionId: string,
   qrUrl: string,
-): Promise<{ success: boolean; userId?: string }> {
+): Promise<{ success: boolean; userId?: string; error?: string }> {
   try {
     const supabase = createServerSupabaseClient(accessToken)
     const { data: userData, error: userError } = await supabase.auth.getUser()
 
     if (userError || !userData.user) {
-      return { success: false }
+      console.error('Erro ao obter usuário:', userError)
+      return { success: false, error: `User error: ${userError?.message}` }
     }
 
-    const { error } = await supabase.from('steam_sessions').upsert({
-      session_id: sessionId,
-      user_id: userData.user.id,
-      instance_id: INSTANCE_ID,
-      status: 'pending',
-      qr_url: qrUrl,
-      updated_at: new Date().toISOString(),
+    console.log('Registrando sessão:', {
+      sessionId,
+      userId: userData.user.id,
+      instanceId: INSTANCE_ID,
     })
 
-    return { success: !error, userId: userData.user.id }
+    const { data, error } = await supabase
+      .from('steam_sessions')
+      .upsert({
+        session_id: sessionId,
+        user_id: userData.user.id,
+        instance_id: INSTANCE_ID,
+        status: 'pending',
+        qr_url: qrUrl,
+        metadata: { instanceId: INSTANCE_ID }, // Metadados da instância
+        updated_at: new Date().toISOString(),
+      })
+      .select()
+
+    if (error) {
+      console.error('Erro ao inserir na tabela steam_sessions:', {
+        error: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code,
+      })
+      return { success: false, error: error.message }
+    }
+
+    console.log('Sessão registrada com sucesso:', data)
+    return { success: true, userId: userData.user.id }
   } catch (error) {
-    console.error('Erro ao registrar sessão:', error)
-    return { success: false }
+    console.error('Erro inesperado ao registrar sessão:', error)
+    return { success: false, error: String(error) }
   }
 }
 
@@ -44,15 +73,22 @@ async function updateSessionStatus(
   accessToken: string,
   sessionId: string,
   status: 'completed' | 'failed' | 'expired',
+  refreshToken?: string,
 ): Promise<void> {
   try {
     const supabase = createServerSupabaseClient(accessToken)
+    const updateData: Record<string, unknown> = {
+      status,
+      updated_at: new Date().toISOString(),
+    }
+
+    if (refreshToken) {
+      updateData.refresh_token = refreshToken
+    }
+
     await supabase
       .from('steam_sessions')
-      .update({
-        status,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updateData)
       .eq('session_id', sessionId)
       .eq('instance_id', INSTANCE_ID) // Apenas a instância que criou pode atualizar
   } catch (error) {
@@ -60,36 +96,18 @@ async function updateSessionStatus(
   }
 }
 
-// Função para verificar se a sessão pertence a esta instância
-async function isMySession(
-  accessToken: string,
-  sessionId: string,
-): Promise<boolean> {
-  try {
-    const supabase = createServerSupabaseClient(accessToken)
-    const { data, error } = await supabase
-      .from('steam_sessions')
-      .select('instance_id')
-      .eq('session_id', sessionId)
-      .single()
-
-    return !error && data?.instance_id === INSTANCE_ID
-  } catch (error) {
-    console.error('Erro ao verificar ownership da sessão:', error)
-    return false
-  }
-}
+// Removida função isMySession - não utilizada na nova implementação
 
 // Função para verificar status da sessão no banco
 async function getSessionStatus(
   accessToken: string,
   sessionId: string,
-): Promise<{ status?: string; found: boolean }> {
+): Promise<{ status?: string; found: boolean; refreshToken?: string }> {
   try {
     const supabase = createServerSupabaseClient(accessToken)
     const { data, error } = await supabase
       .from('steam_sessions')
-      .select('status, expires_at')
+      .select('status, expires_at, refresh_token, metadata')
       .eq('session_id', sessionId)
       .single()
 
@@ -110,18 +128,50 @@ async function getSessionStatus(
       return { status: 'expired', found: true }
     }
 
-    return { status: data.status, found: true }
+    return {
+      status: data.status,
+      found: true,
+      refreshToken: data.refresh_token,
+    }
   } catch (error) {
     console.error('Erro ao verificar status da sessão:', error)
     return { found: false }
   }
 }
 
-// Função para limpar sessão
-function cleanupSession(sessionId: string) {
-  activeSessions.delete(sessionId)
-  // Não precisa limpar do banco, deixa expirar naturalmente
+// Função para criar QR Code usando steam-session (sem polling automático)
+async function createSteamQRAuth(): Promise<SteamQRAuthData | null> {
+  try {
+    console.log('Criando sessão Steam...')
+
+    // Criar sessão Steam mas não iniciar polling automático
+    const session = new LoginSession(EAuthTokenPlatformType.WebBrowser)
+    const sessionId = Math.random().toString(36).substring(7)
+
+    // Apenas iniciar QR, não aguardar polling
+    const { qrChallengeUrl } = await session.startWithQR()
+
+    if (!qrChallengeUrl) {
+      throw new Error('Falha ao obter QR Challenge URL')
+    }
+
+    console.log('QR Code criado:', qrChallengeUrl)
+
+    // Armazenar sessão Steam para polling controlado
+    activeSteamSessions.set(sessionId, session)
+
+    return {
+      sessionId,
+      qrUrl: qrChallengeUrl,
+      steamSession: session,
+    }
+  } catch (error) {
+    console.error('Erro ao criar QR Auth:', error)
+    return null
+  }
 }
+
+// Removida função checkSteamAuthStatus - usando eventos da steam-session diretamente
 
 // POST - Iniciar processo de autenticação Steam
 export async function POST(req: Request): Promise<Response> {
@@ -141,38 +191,35 @@ export async function POST(req: Request): Promise<Response> {
       )
     }
 
-    // Criar nova sessão Steam
-    const session = new LoginSession(EAuthTokenPlatformType.WebBrowser)
-    const sessionId = Math.random().toString(36).substring(7)
-
-    // Iniciar processo de autenticação
-    const { qrChallengeUrl } = await session.startWithQR()
-
-    // Registrar sessão no banco
-    if (!accessToken) {
+    // Criar QR Code usando API direta
+    const qrAuthData = await createSteamQRAuth()
+    if (!qrAuthData) {
       return new Response(
         JSON.stringify({
           success: false,
           error: {
-            message: 'Token de acesso inválido',
-            code: 'INVALID_TOKEN',
+            message: 'Erro ao criar QR Code Steam',
+            code: 'STEAM_API_ERROR',
           },
         }),
-        { status: 401, headers: { 'Content-Type': 'application/json' } },
+        { status: 500, headers: { 'Content-Type': 'application/json' } },
       )
     }
 
+    // Registrar sessão no banco
     const registerResult = await registerSession(
       accessToken,
-      sessionId,
-      qrChallengeUrl!,
+      qrAuthData.sessionId,
+      qrAuthData.qrUrl,
     )
+
     if (!registerResult.success) {
+      console.error('Falha ao registrar sessão:', registerResult.error)
       return new Response(
         JSON.stringify({
           success: false,
           error: {
-            message: 'Erro ao registrar sessão',
+            message: `Erro ao registrar sessão: ${registerResult.error}`,
             code: 'REGISTRATION_ERROR',
           },
         }),
@@ -180,44 +227,15 @@ export async function POST(req: Request): Promise<Response> {
       )
     }
 
-    // Armazenar sessão localmente
-    activeSessions.set(sessionId, session)
-
-    // Capturar accessToken no escopo para usar nos callbacks
-    const tokenForCallbacks = accessToken as string
-
-    // Configurar evento de autenticação
-    session.on('authenticated', async () => {
-      console.log('✅ Sessão autenticada:', sessionId)
-      try {
-        if (session.refreshToken) {
-          const steamAuth = SteamAuthService.getInstance()
-          await steamAuth.saveRefreshToken(
-            tokenForCallbacks,
-            session.refreshToken,
-          )
-          await updateSessionStatus(tokenForCallbacks, sessionId, 'completed')
-        }
-      } catch (error) {
-        console.error('Erro ao salvar refresh token:', error)
-        await updateSessionStatus(tokenForCallbacks, sessionId, 'failed')
-      } finally {
-        cleanupSession(sessionId)
-      }
-    })
-
-    session.on('error', async (error) => {
-      console.error('❌ Erro na sessão Steam:', sessionId, error)
-      await updateSessionStatus(tokenForCallbacks, sessionId, 'failed')
-      cleanupSession(sessionId)
-    })
+    // Iniciar polling da instância proprietária
+    startSessionPolling(accessToken, qrAuthData)
 
     return new Response(
       JSON.stringify({
         success: true,
         data: {
-          sessionId,
-          qrUrl: qrChallengeUrl,
+          sessionId: qrAuthData.sessionId,
+          qrUrl: qrAuthData.qrUrl,
           message:
             'Processo de autenticação Steam iniciado. Escaneie o QR code.',
         },
@@ -238,6 +256,54 @@ export async function POST(req: Request): Promise<Response> {
       { status: 500, headers: { 'Content-Type': 'application/json' } },
     )
   }
+}
+
+// Função para fazer polling apenas na instância proprietária
+function startSessionPolling(accessToken: string, qrAuthData: SteamQRAuthData) {
+  const session = qrAuthData.steamSession
+
+  // Configurar eventos da sessão Steam
+  session.on('authenticated', async () => {
+    console.log('✅ Sessão Steam autenticada:', qrAuthData.sessionId)
+    try {
+      if (session.refreshToken) {
+        const steamAuth = SteamAuthService.getInstance()
+        await steamAuth.saveRefreshToken(accessToken, session.refreshToken)
+
+        await updateSessionStatus(
+          accessToken,
+          qrAuthData.sessionId,
+          'completed',
+          session.refreshToken,
+        )
+
+        console.log('✅ Refresh token salvo com sucesso')
+      }
+    } catch (error) {
+      console.error('❌ Erro ao salvar refresh token:', error)
+      await updateSessionStatus(accessToken, qrAuthData.sessionId, 'failed')
+    } finally {
+      activeSteamSessions.delete(qrAuthData.sessionId)
+    }
+  })
+
+  session.on('error', async (error) => {
+    console.error('❌ Erro na sessão Steam:', error)
+    await updateSessionStatus(accessToken, qrAuthData.sessionId, 'failed')
+    activeSteamSessions.delete(qrAuthData.sessionId)
+  })
+
+  // Timeout após 10 minutos
+  setTimeout(
+    () => {
+      if (activeSteamSessions.has(qrAuthData.sessionId)) {
+        console.log('⏰ Timeout da sessão Steam:', qrAuthData.sessionId)
+        updateSessionStatus(accessToken, qrAuthData.sessionId, 'expired')
+        activeSteamSessions.delete(qrAuthData.sessionId)
+      }
+    },
+    10 * 60 * 1000,
+  )
 }
 
 // GET - Verificar status da autenticação
@@ -297,23 +363,18 @@ export async function GET(req: Request): Promise<Response> {
       )
     }
 
-    // Se a sessão pertence a esta instância, verificar se ainda está ativa
-    const isOwner = await isMySession(accessToken, sessionId)
-    if (isOwner) {
-      const session = activeSessions.get(sessionId)
-      if (session?.refreshToken) {
-        // Autenticação foi concluída mas ainda não foi processada
-        return new Response(
-          JSON.stringify({
-            success: true,
-            data: {
-              status: 'completed',
-              authenticated: true,
-            },
-          }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } },
-        )
-      }
+    // Se a sessão foi concluída e tem refresh token
+    if (sessionStatus.status === 'completed' && sessionStatus.refreshToken) {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          data: {
+            status: 'completed',
+            authenticated: true,
+          },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      )
     }
 
     // Retornar status baseado no banco
