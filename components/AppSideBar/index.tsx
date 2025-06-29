@@ -97,7 +97,7 @@ const data = {
     },
     {
       name: 'Instagram',
-      url: 'https://www.instagram.com/xtskins/',
+      url: 'https://www.instagram.com/xtskins_',
       icon: Instagram,
       target: '_blank',
     },

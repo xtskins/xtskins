@@ -19,7 +19,7 @@ export function StructuredData({
     url: 'https://xtskins.com.br',
     logo: 'https://xtskins.com.br/logo.png',
     description: 'A maior loja de skins CS2 do Brasil',
-    sameAs: ['https://twitter.com/xtskins', 'https://instagram.com/xtskins'],
+    sameAs: ['https://twitter.com/xtskins', 'https://instagram.com/xtskins_'],
   }
 
   // Dados do site

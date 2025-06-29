@@ -109,13 +109,12 @@ export function OrderProvider({ children }: OrderProviderProps) {
     }
 
     try {
-      // Gerar token reCAPTCHA antes de criar o pedido
       const recaptchaToken = await executeRecaptchaAction('create_order')
 
       const orderData: CreateOrderInput = {
         items: items.map((item) => ({
           skin_id: item.id,
-          quantity: 1, // Por enquanto sempre 1, mas pode ser expandido
+          quantity: 1,
         })),
         coupon_code: couponCode,
         recaptcha_token: recaptchaToken,
