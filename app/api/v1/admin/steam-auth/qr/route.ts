@@ -262,9 +262,11 @@ export async function POST(req: Request): Promise<Response> {
 function startSessionPolling(accessToken: string, qrAuthData: SteamQRAuthData) {
   const session = qrAuthData.steamSession
 
-  // Configurar eventos da sessão Steam
+  console.log('🔄 Iniciando polling da sessão Steam:', qrAuthData.sessionId)
+
+  // Configurar eventos da sessão Steam (funcionam em local, podem não funcionar em produção)
   session.on('authenticated', async () => {
-    console.log('✅ Sessão Steam autenticada:', qrAuthData.sessionId)
+    console.log('✅ Evento authenticated disparado:', qrAuthData.sessionId)
     try {
       if (session.refreshToken) {
         const steamAuth = SteamAuthService.getInstance()
@@ -277,11 +279,10 @@ function startSessionPolling(accessToken: string, qrAuthData: SteamQRAuthData) {
           session.refreshToken,
         )
 
-        console.log('✅ Refresh token salvo com sucesso')
+        console.log('✅ Refresh token salvo via evento')
       }
     } catch (error) {
-      console.error('❌ Erro ao salvar refresh token:', error)
-      await updateSessionStatus(accessToken, qrAuthData.sessionId, 'failed')
+      console.error('❌ Erro ao salvar refresh token via evento:', error)
     } finally {
       activeSteamSessions.delete(qrAuthData.sessionId)
     }
@@ -293,6 +294,47 @@ function startSessionPolling(accessToken: string, qrAuthData: SteamQRAuthData) {
     activeSteamSessions.delete(qrAuthData.sessionId)
   })
 
+  // Polling manual como fallback para produção
+  const pollInterval = setInterval(async () => {
+    try {
+      console.log(
+        '🔄 Verificando status da sessão Steam:',
+        qrAuthData.sessionId,
+      )
+
+      // Verificar se a sessão ainda existe
+      if (!activeSteamSessions.has(qrAuthData.sessionId)) {
+        console.log('❌ Sessão não encontrada na memória, parando polling')
+        clearInterval(pollInterval)
+        return
+      }
+
+      // Verificar se foi autenticada
+      if (session.refreshToken) {
+        console.log(
+          '✅ Refresh token detectado via polling:',
+          session.refreshToken,
+        )
+
+        const steamAuth = SteamAuthService.getInstance()
+        await steamAuth.saveRefreshToken(accessToken, session.refreshToken)
+
+        await updateSessionStatus(
+          accessToken,
+          qrAuthData.sessionId,
+          'completed',
+          session.refreshToken,
+        )
+
+        console.log('✅ Refresh token salvo via polling')
+        activeSteamSessions.delete(qrAuthData.sessionId)
+        clearInterval(pollInterval)
+      }
+    } catch (error) {
+      console.error('❌ Erro no polling manual:', error)
+    }
+  }, 3000) // Verificar a cada 3 segundos
+
   // Timeout após 10 minutos
   setTimeout(
     () => {
@@ -301,6 +343,7 @@ function startSessionPolling(accessToken: string, qrAuthData: SteamQRAuthData) {
         updateSessionStatus(accessToken, qrAuthData.sessionId, 'expired')
         activeSteamSessions.delete(qrAuthData.sessionId)
       }
+      clearInterval(pollInterval)
     },
     10 * 60 * 1000,
   )
