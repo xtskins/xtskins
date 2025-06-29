@@ -6,14 +6,10 @@ import { randomUUID } from 'crypto'
 // ID único desta instância do servidor
 const INSTANCE_ID = randomUUID()
 
-// Armazenar sessões Steam ativas apenas desta instância
-const activeSteamSessions = new Map<string, LoginSession>()
-
 // Interface para dados da sessão Steam
 interface SteamQRAuthData {
   sessionId: string
   qrUrl: string
-  steamSession: LoginSession
 }
 
 // Função para registrar sessão no banco
@@ -45,7 +41,7 @@ async function registerSession(
         instance_id: INSTANCE_ID,
         status: 'pending',
         qr_url: qrUrl,
-        metadata: { instanceId: INSTANCE_ID }, // Metadados da instância
+        metadata: { instanceId: INSTANCE_ID },
         updated_at: new Date().toISOString(),
       })
       .select()
@@ -67,36 +63,6 @@ async function registerSession(
     return { success: false, error: String(error) }
   }
 }
-
-// Função para atualizar status da sessão
-async function updateSessionStatus(
-  accessToken: string,
-  sessionId: string,
-  status: 'completed' | 'failed' | 'expired',
-  refreshToken?: string,
-): Promise<void> {
-  try {
-    const supabase = createServerSupabaseClient(accessToken)
-    const updateData: Record<string, unknown> = {
-      status,
-      updated_at: new Date().toISOString(),
-    }
-
-    if (refreshToken) {
-      updateData.refresh_token = refreshToken
-    }
-
-    await supabase
-      .from('steam_sessions')
-      .update(updateData)
-      .eq('session_id', sessionId)
-      .eq('instance_id', INSTANCE_ID) // Apenas a instância que criou pode atualizar
-  } catch (error) {
-    console.error('Erro ao atualizar status da sessão:', error)
-  }
-}
-
-// Removida função isMySession - não utilizada na nova implementação
 
 // Função para verificar status da sessão no banco
 async function getSessionStatus(
@@ -139,39 +105,31 @@ async function getSessionStatus(
   }
 }
 
-// Função para criar QR Code usando steam-session (sem polling automático)
+// Função para criar QR Code de forma simples
 async function createSteamQRAuth(): Promise<SteamQRAuthData | null> {
   try {
-    console.log('Criando sessão Steam...')
+    console.log('🔄 Criando QR Code Steam (modo simples)...')
 
-    // Criar sessão Steam mas não iniciar polling automático
     const session = new LoginSession(EAuthTokenPlatformType.WebBrowser)
     const sessionId = Math.random().toString(36).substring(7)
 
-    // Apenas iniciar QR, não aguardar polling
     const { qrChallengeUrl } = await session.startWithQR()
 
     if (!qrChallengeUrl) {
       throw new Error('Falha ao obter QR Challenge URL')
     }
 
-    console.log('QR Code criado:', qrChallengeUrl)
-
-    // Armazenar sessão Steam para polling controlado
-    activeSteamSessions.set(sessionId, session)
+    console.log('✅ QR Code criado:', qrChallengeUrl)
 
     return {
       sessionId,
       qrUrl: qrChallengeUrl,
-      steamSession: session,
     }
   } catch (error) {
-    console.error('Erro ao criar QR Auth:', error)
+    console.error('❌ Erro ao criar QR Auth:', error)
     return null
   }
 }
-
-// Removida função checkSteamAuthStatus - usando eventos da steam-session diretamente
 
 // POST - Iniciar processo de autenticação Steam
 export async function POST(req: Request): Promise<Response> {
@@ -191,7 +149,9 @@ export async function POST(req: Request): Promise<Response> {
       )
     }
 
-    // Criar QR Code usando API direta
+    console.log('🚀 Iniciando processo de autenticação Steam...')
+
+    // Criar QR Code
     const qrAuthData = await createSteamQRAuth()
     if (!qrAuthData) {
       return new Response(
@@ -227,8 +187,7 @@ export async function POST(req: Request): Promise<Response> {
       )
     }
 
-    // Iniciar polling da instância proprietária
-    startSessionPolling(accessToken, qrAuthData)
+    console.log('✅ QR Code e sessão criados com sucesso')
 
     return new Response(
       JSON.stringify({
@@ -237,13 +196,13 @@ export async function POST(req: Request): Promise<Response> {
           sessionId: qrAuthData.sessionId,
           qrUrl: qrAuthData.qrUrl,
           message:
-            'Processo de autenticação Steam iniciado. Escaneie o QR code.',
+            'QR Code gerado. O frontend fará o polling para detectar a autenticação.',
         },
       }),
       { status: 200, headers: { 'Content-Type': 'application/json' } },
     )
   } catch (error) {
-    console.error('Erro ao iniciar autenticação Steam:', error)
+    console.error('❌ Erro geral ao iniciar autenticação Steam:', error)
 
     return new Response(
       JSON.stringify({
@@ -256,68 +215,6 @@ export async function POST(req: Request): Promise<Response> {
       { status: 500, headers: { 'Content-Type': 'application/json' } },
     )
   }
-}
-
-// Função para fazer polling apenas na instância proprietária
-function startSessionPolling(accessToken: string, qrAuthData: SteamQRAuthData) {
-  const session = qrAuthData.steamSession
-
-  console.log('🔄 Iniciando polling da sessão Steam:', qrAuthData.sessionId)
-
-  // Configurar APENAS eventos nativos - sem polling manual que causa problemas
-  session.on('authenticated', async () => {
-    console.log('✅ EVENTO AUTHENTICATED disparado:', qrAuthData.sessionId)
-    try {
-      if (session.refreshToken) {
-        console.log(
-          '🔑 Refresh token obtido via evento:',
-          session.refreshToken.substring(0, 20) + '...',
-        )
-
-        const steamAuth = SteamAuthService.getInstance()
-        await steamAuth.saveRefreshToken(accessToken, session.refreshToken)
-
-        await updateSessionStatus(
-          accessToken,
-          qrAuthData.sessionId,
-          'completed',
-          session.refreshToken,
-        )
-
-        console.log('✅ Refresh token salvo com sucesso via evento')
-      }
-    } catch (error) {
-      console.error('❌ Erro ao salvar refresh token via evento:', error)
-      await updateSessionStatus(accessToken, qrAuthData.sessionId, 'failed')
-    } finally {
-      activeSteamSessions.delete(qrAuthData.sessionId)
-    }
-  })
-
-  session.on('error', async (error) => {
-    console.error('❌ ERRO na sessão Steam:', error)
-    await updateSessionStatus(accessToken, qrAuthData.sessionId, 'failed')
-    activeSteamSessions.delete(qrAuthData.sessionId)
-  })
-
-  // Timeout de segurança (sem polling manual)
-  setTimeout(
-    () => {
-      if (activeSteamSessions.has(qrAuthData.sessionId)) {
-        console.log(
-          '⏰ Timeout da sessão Steam (10 min):',
-          qrAuthData.sessionId,
-        )
-        updateSessionStatus(accessToken, qrAuthData.sessionId, 'expired')
-        activeSteamSessions.delete(qrAuthData.sessionId)
-      }
-    },
-    10 * 60 * 1000,
-  )
-
-  console.log(
-    '🎯 Sessão Steam configurada - aguardando evento authenticated...',
-  )
 }
 
 // GET - Verificar status da autenticação
@@ -340,12 +237,32 @@ export async function GET(req: Request): Promise<Response> {
       )
     }
 
-    // Primeiro, verificar se já existe refresh token (autenticação concluída)
+    console.log('🔍 Verificando status da sessão:', sessionId)
+
+    // Primeiro, verificar se já existe refresh token no sistema
     try {
       const steamAuth = SteamAuthService.getInstance()
       const refreshToken = await steamAuth.getRefreshToken(accessToken)
 
       if (refreshToken) {
+        console.log('✅ Refresh token já existe no sistema')
+
+        // Marcar sessão como completed no banco se ainda estiver pending
+        try {
+          const supabase = createServerSupabaseClient(accessToken)
+          await supabase
+            .from('steam_sessions')
+            .update({
+              status: 'completed',
+              refresh_token: refreshToken,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('session_id', sessionId)
+            .eq('status', 'pending')
+        } catch (updateError) {
+          console.log('⚠️ Erro ao atualizar status (não crítico):', updateError)
+        }
+
         return new Response(
           JSON.stringify({
             success: true,
@@ -358,7 +275,7 @@ export async function GET(req: Request): Promise<Response> {
         )
       }
     } catch (error) {
-      console.error('Erro ao verificar refresh token:', error)
+      console.log('⚠️ Erro ao verificar refresh token (não crítico):', error)
     }
 
     // Verificar status da sessão no banco
@@ -380,7 +297,6 @@ export async function GET(req: Request): Promise<Response> {
     console.log('📊 Status da sessão no banco:', {
       sessionId,
       status: sessionStatus.status,
-      instanceId: INSTANCE_ID,
       hasRefreshToken: !!sessionStatus.refreshToken,
     })
 
@@ -399,40 +315,23 @@ export async function GET(req: Request): Promise<Response> {
       )
     }
 
-    // Retornar status baseado no banco
-    const status =
-      sessionStatus.status === 'completed'
-        ? 'completed'
-        : sessionStatus.status === 'failed'
-          ? 'failed'
-          : sessionStatus.status === 'expired'
-            ? 'expired'
-            : 'pending'
-
-    console.log('📈 Retornando status:', status)
-
-    if (status === 'failed' || status === 'expired') {
+    // Verificar se expirou
+    if (sessionStatus.status === 'expired') {
+      console.log('⏰ Sessão expirada')
       return new Response(
         JSON.stringify({
           success: false,
           error: {
-            message:
-              status === 'expired'
-                ? 'Sessão expirada'
-                : 'Falha na autenticação',
-            code:
-              status === 'expired'
-                ? 'SESSION_EXPIRED'
-                : 'AUTHENTICATION_FAILED',
+            message: 'Sessão expirada',
+            code: 'SESSION_EXPIRED',
           },
         }),
-        {
-          status: status === 'expired' ? 410 : 400,
-          headers: { 'Content-Type': 'application/json' },
-        },
+        { status: 410, headers: { 'Content-Type': 'application/json' } },
       )
     }
 
+    // Retornar pending para continuar polling
+    console.log('⏳ Sessão ainda pendente')
     return new Response(
       JSON.stringify({
         success: true,
@@ -444,7 +343,7 @@ export async function GET(req: Request): Promise<Response> {
       { status: 200, headers: { 'Content-Type': 'application/json' } },
     )
   } catch (error) {
-    console.error('Erro ao verificar status da autenticação:', error)
+    console.error('❌ Erro ao verificar status da autenticação:', error)
 
     return new Response(
       JSON.stringify({
