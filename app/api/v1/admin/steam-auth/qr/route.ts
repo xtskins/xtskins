@@ -106,39 +106,8 @@ export async function GET(req: Request): Promise<Response> {
     const sessionCreatedAt = sessionTimestamps.get(sessionId)
 
     if (!session) {
-      // Se não temos timestamp, significa que a sessão nunca existiu ou expirou
-      if (!sessionCreatedAt) {
-        return new Response(
-          JSON.stringify({
-            success: false,
-            error: {
-              message: 'Sessão não encontrada ou expirada',
-              code: 'SESSION_NOT_FOUND',
-            },
-          }),
-          { status: 404, headers: { 'Content-Type': 'application/json' } },
-        )
-      }
-
-      // Se a sessão foi criada há mais de 10 minutos, considerar expirada
-      const sessionAge = Date.now() - sessionCreatedAt
-      if (sessionAge > 10 * 60 * 1000) {
-        // 10 minutos
-        sessionTimestamps.delete(sessionId)
-        return new Response(
-          JSON.stringify({
-            success: false,
-            error: {
-              message: 'Sessão expirada',
-              code: 'SESSION_EXPIRED',
-            },
-          }),
-          { status: 410, headers: { 'Content-Type': 'application/json' } },
-        )
-      }
-
-      // Se chegou aqui, provavelmente é um problema de instâncias diferentes em produção
-      // Verificar se a autenticação já foi salva no banco
+      // Primeiro, sempre verificar se a autenticação já foi salva no banco
+      // (isso resolve problemas de múltiplas instâncias em produção)
       try {
         const steamAuth = SteamAuthService.getInstance()
         const refreshToken = await steamAuth.getRefreshToken(
@@ -146,8 +115,10 @@ export async function GET(req: Request): Promise<Response> {
         )
 
         if (refreshToken) {
-          // Autenticação foi concluída, limpar timestamp
-          sessionTimestamps.delete(sessionId)
+          // Autenticação foi concluída, limpar timestamp se existir
+          if (sessionCreatedAt) {
+            sessionTimestamps.delete(sessionId)
+          }
           return new Response(
             JSON.stringify({
               success: true,
@@ -163,7 +134,27 @@ export async function GET(req: Request): Promise<Response> {
         console.error('Erro ao verificar refresh token:', error)
       }
 
-      // Sessão ainda está pendente (provavelmente problema de instâncias)
+      // Se temos timestamp, verificar se a sessão expirou
+      if (sessionCreatedAt) {
+        const sessionAge = Date.now() - sessionCreatedAt
+        if (sessionAge > 10 * 60 * 1000) {
+          // 10 minutos
+          sessionTimestamps.delete(sessionId)
+          return new Response(
+            JSON.stringify({
+              success: false,
+              error: {
+                message: 'Sessão expirada',
+                code: 'SESSION_EXPIRED',
+              },
+            }),
+            { status: 410, headers: { 'Content-Type': 'application/json' } },
+          )
+        }
+      }
+
+      // Sessão ainda está pendente (pode ser problema de instâncias diferentes)
+      // Retornar pending em vez de erro para permitir continuar o polling
       return new Response(
         JSON.stringify({
           success: true,
