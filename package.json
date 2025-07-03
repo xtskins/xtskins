@@ -4,6 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
+    "dev:ngrok": "next dev --turbopack --port 3000",
+    "dev:auto": "./scripts/dev-with-ngrok.sh",
+    "ngrok": "ngrok http 3000",
+    "ngrok:subdomain": "ngrok http 3000 --subdomain=xtskins-dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"

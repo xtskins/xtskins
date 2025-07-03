@@ -1,6 +1,9 @@
 import { LoginSession, EAuthTokenPlatformType } from 'steam-session'
 import { SteamAuthService } from '@/lib/steam/steam-auth-service'
 
+// Armazenar sessões temporariamente (em produção, considere usar Redis)
+const activeSessions = new Map<string, LoginSession>()
+
 // POST - Iniciar processo de autenticação Steam
 export async function POST(req: Request): Promise<Response> {
   try {
@@ -23,43 +26,28 @@ export async function POST(req: Request): Promise<Response> {
     const session = new LoginSession(EAuthTokenPlatformType.WebBrowser)
     const sessionId = Math.random().toString(36).substring(7)
 
-    // Configurar evento de autenticação de forma assíncrona
+    // Armazenar sessão temporariamente
+    activeSessions.set(sessionId, session)
+
+    // Configurar evento de autenticação
     session.on('authenticated', async () => {
-      try {
-        // Salvar refresh token no banco
-        if (session.refreshToken) {
-          const steamAuth = SteamAuthService.getInstance()
-          await steamAuth.saveRefreshToken(accessToken, session.refreshToken)
-          console.log('Refresh token salvo com sucesso')
-        }
-      } catch (error) {
-        console.error(
-          'Erro ao salvar refresh token:',
-          error instanceof Error ? error.message : String(error),
-        )
+      // Salvar refresh token no banco
+      if (session.refreshToken) {
+        const steamAuth = SteamAuthService.getInstance()
+        await steamAuth.saveRefreshToken(accessToken, session.refreshToken)
       }
+
+      // Limpar sessão após salvar
+      activeSessions.delete(sessionId)
     })
 
     session.on('error', (error) => {
       console.error('Erro na autenticação Steam:', error)
+      activeSessions.delete(sessionId)
     })
 
     // Iniciar processo de autenticação
     const { qrChallengeUrl } = await session.startWithQR()
-
-    // Não armazenar a sessão em memória - deixar que a biblioteca gerencie
-    // Iniciar polling em background de forma não-bloqueante
-    setImmediate(async () => {
-      try {
-        await session.refreshAccessToken()
-      } catch (error) {
-        // Ignorar erros de polling em background
-        console.log(
-          'Polling finalizado ou erro esperado:',
-          error instanceof Error ? error.message : String(error),
-        )
-      }
-    })
 
     return new Response(
       JSON.stringify({
@@ -94,7 +82,6 @@ export async function GET(req: Request): Promise<Response> {
   try {
     const url = new URL(req.url)
     const sessionId = url.searchParams.get('sessionId')
-    const accessToken = req.headers.get('authorization')?.replace('Bearer ', '')
 
     if (!sessionId) {
       return new Response(
@@ -109,47 +96,30 @@ export async function GET(req: Request): Promise<Response> {
       )
     }
 
-    if (!accessToken) {
+    const session = activeSessions.get(sessionId)
+
+    if (!session) {
       return new Response(
         JSON.stringify({
-          success: false,
-          error: {
-            message: 'Token de acesso é obrigatório',
-            code: 'VALIDATION_ERROR',
+          success: true,
+          data: {
+            status: 'completed', // Sessão não existe = já foi processada
+            authenticated: true,
           },
         }),
-        { status: 401, headers: { 'Content-Type': 'application/json' } },
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
       )
     }
 
-    // Em vez de verificar a sessão em memória, verificar se já existe refresh token no banco
-    try {
-      const steamAuth = SteamAuthService.getInstance()
-      const refreshToken = await steamAuth.getRefreshToken(accessToken)
+    // Verificar se já foi autenticado
+    const isAuthenticated = !!session.refreshToken
 
-      if (refreshToken) {
-        return new Response(
-          JSON.stringify({
-            success: true,
-            data: {
-              status: 'completed',
-              authenticated: true,
-            },
-          }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } },
-        )
-      }
-    } catch (error) {
-      console.error('Erro ao verificar refresh token:', error)
-    }
-
-    // Se não tem refresh token, ainda está pendente
     return new Response(
       JSON.stringify({
         success: true,
         data: {
-          status: 'pending',
-          authenticated: false,
+          status: isAuthenticated ? 'completed' : 'pending',
+          authenticated: isAuthenticated,
         },
       }),
       { status: 200, headers: { 'Content-Type': 'application/json' } },
