@@ -108,7 +108,7 @@ export const skinSchema = z.object({
   inspectlink: z.string().nullable(),
   steamurl: z.string().nullable(),
   is_visible: z.boolean(),
-  price_manually_set: z.boolean(),
+  price_manually_set: z.boolean().default(false),
   float_value: z.number().nullable(),
   count: z.number(),
   created_at: z.string(),

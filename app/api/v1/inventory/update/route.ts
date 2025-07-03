@@ -91,6 +91,7 @@ export async function POST(req: Request): Promise<Response> {
       discount_price?: string
       is_visible?: boolean
       price_manually_set?: boolean
+      discount?: number
     } = {
       updated_at: new Date().toISOString(),
     }
@@ -98,6 +99,25 @@ export async function POST(req: Request): Promise<Response> {
     if (validatedData.discount_price !== undefined) {
       updateData.discount_price = validatedData.discount_price
       updateData.price_manually_set = true // Marcar que o preço foi alterado manualmente
+
+      // Buscar o preço original da skin para calcular o novo desconto
+      const { data: currentSkin } = await supabase
+        .from('skins')
+        .select('price')
+        .eq('id', validatedData.skinId)
+        .single()
+
+      if (currentSkin) {
+        const originalPrice = parseFloat(currentSkin.price)
+        const newDiscountPrice = parseFloat(validatedData.discount_price)
+
+        // Calcula o novo desconto
+        if (originalPrice > 0 && newDiscountPrice > 0) {
+          const newDiscount =
+            ((originalPrice - newDiscountPrice) / originalPrice) * 100
+          updateData.discount = Math.round(newDiscount) // Arredonda para número inteiro
+        }
+      }
     }
 
     if (validatedData.is_visible !== undefined) {

@@ -16,8 +16,7 @@ let skinsCache: {
 let isUpdating = false
 let updatePromise: Promise<void> | null = null
 
-const CACHE_TTL =
-  process.env.NODE_ENV === 'development' ? 1 * 60 * 1000 : 2 * 60 * 1000 // 2 minutos em produção (reduzido para melhor responsividade)
+const CACHE_TTL = process.env.NODE_ENV === 'development' ? 0 : 2 * 60 * 1000 // 2 min em produção, sem cache em dev
 
 // Tags de cache para invalidação
 const SKINS_CACHE_TAG = 'skins-data'
@@ -76,7 +75,7 @@ export async function getCachedSkinsForLayout() {
     }
   } catch (error) {
     console.error('❌ Erro ao buscar dados para layout:', error)
-    // Fallback para o método antigo se der erro
+    // Fallback para o método antigo se derro
     return await getCachedSkins()
   }
 }

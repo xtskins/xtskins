@@ -145,7 +145,7 @@ export function CartButton({ onClick }: CartButtonProps) {
       )
       .join('\n')
 
-    const subtotal = orderState.totalValue
+    const subtotal = orderState.originalValue
     const desconto =
       orderState.totalDiscount + (appliedCoupon?.discount_amount || 0)
     const total = finalPrice

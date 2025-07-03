@@ -409,6 +409,7 @@ async function processInventoryData(
       user_id: userData.user.id,
       steamid: steamId,
       updated_at: new Date().toISOString(),
+      price_manually_set: false, // Define explicitamente como false para novas skins
     }
   })
 

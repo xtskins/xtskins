@@ -76,8 +76,15 @@ export async function GET(req: Request): Promise<Response> {
       )
     }
 
-    // Validar cada skin usando o schema
-    const validatedSkins = data.map((skin) => skinSchema.parse(skin))
+    // Validar cada skin usando o schema e tratar price_manually_set null
+    const validatedSkins = data.map((skin) => {
+      // Se price_manually_set for null, define como false antes da validação
+      const skinWithDefaultPriceManuallySet = {
+        ...skin,
+        price_manually_set: skin.price_manually_set ?? false,
+      }
+      return skinSchema.parse(skinWithDefaultPriceManuallySet)
+    })
 
     // Ordenar por preço (maior para menor) - mesma lógica dos outros endpoints
     const sortedSkins = validatedSkins.sort((a, b) => {
