@@ -21,7 +21,7 @@ export const descriptionSchema = z.object({
 
 // Schema para os dados recebidos da API externa
 export const externalSkinDataSchema = z.object({
-  id: z.string(),
+  id: z.string().optional(),
   markethashname: z.string(),
   marketname: z.string(),
   normalizedname: z.string().optional(),
