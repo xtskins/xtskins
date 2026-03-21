@@ -9,6 +9,8 @@ export function useSteamAuthCheck() {
       return response.data
     },
     retry: false,
-    staleTime: 1000 * 60 * 5, // 5 minutos
+    // Curto: após configurar Steam via QR o /check precisa refletir rápido no painel.
+    staleTime: 0,
+    gcTime: 1000 * 60 * 5,
   })
 }

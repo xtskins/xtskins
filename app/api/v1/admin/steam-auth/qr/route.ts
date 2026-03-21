@@ -1,5 +1,9 @@
+import { after } from 'next/server'
 import { LoginSession, EAuthTokenPlatformType } from 'steam-session'
 import { SteamAuthService } from '@/lib/steam/steam-auth-service'
+
+/** Mantém a função serverless viva o suficiente para salvar o token após o POST retornar (Vercel). */
+const AUTH_AFTER_MAX_MS = 240_000
 
 // Armazenar sessões temporariamente (em produção, considere usar Redis)
 const activeSessions = new Map<string, LoginSession>()
@@ -29,25 +33,59 @@ export async function POST(req: Request): Promise<Response> {
     // Armazenar sessão temporariamente
     activeSessions.set(sessionId, session)
 
+    let done = false
+    let resolveLatch!: () => void
+    const afterAuthWork = new Promise<void>((resolve) => {
+      resolveLatch = () => resolve()
+    })
+
+    const signalAuthWorkDone = () => {
+      if (done) return
+      done = true
+      resolveLatch()
+    }
+
     // Configurar evento de autenticação
     session.on('authenticated', async () => {
-      // Salvar refresh token no banco
-      if (session.refreshToken) {
-        const steamAuth = SteamAuthService.getInstance()
-        await steamAuth.saveRefreshToken(accessToken, session.refreshToken)
+      try {
+        if (session.refreshToken) {
+          const steamAuth = SteamAuthService.getInstance()
+          const result = await steamAuth.saveRefreshToken(
+            accessToken,
+            session.refreshToken,
+          )
+          if (!result.success) {
+            console.error(
+              '[steam-auth/qr] saveRefreshToken falhou:',
+              result.error,
+            )
+          }
+        } else {
+          console.warn('[steam-auth/qr] authenticated sem refreshToken')
+        }
+      } catch (e) {
+        console.error('[steam-auth/qr] erro no handler authenticated:', e)
+      } finally {
+        activeSessions.delete(sessionId)
+        signalAuthWorkDone()
       }
-
-      // Limpar sessão após salvar
-      activeSessions.delete(sessionId)
     })
 
     session.on('error', (error) => {
       console.error('Erro na autenticação Steam:', error)
       activeSessions.delete(sessionId)
+      signalAuthWorkDone()
     })
 
     // Iniciar processo de autenticação
     const { qrChallengeUrl } = await session.startWithQR()
+
+    after(async () => {
+      await Promise.race([
+        afterAuthWork,
+        new Promise<void>((r) => setTimeout(r, AUTH_AFTER_MAX_MS)),
+      ])
+    })
 
     return new Response(
       JSON.stringify({

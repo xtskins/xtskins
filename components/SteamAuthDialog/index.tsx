@@ -1,5 +1,7 @@
 'use client'
 
+import { useEffect } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   Dialog,
   DialogContent,
@@ -28,7 +30,22 @@ export default function SteamAuthDialog({
   onClose,
   required = false,
 }: SteamAuthDialogProps) {
+  const queryClient = useQueryClient()
   const { state, startQRAuth, isStarting, resetAuth } = useSteamQRAuth()
+
+  useEffect(() => {
+    if (!open) {
+      resetAuth()
+    }
+  }, [open, resetAuth])
+
+  useEffect(() => {
+    if (!open || state.status !== 'waiting') return
+    const id = setInterval(() => {
+      void queryClient.invalidateQueries({ queryKey: ['steam-auth-check'] })
+    }, 2500)
+    return () => clearInterval(id)
+  }, [open, state.status, queryClient])
 
   const handleStartAuth = async () => {
     try {
