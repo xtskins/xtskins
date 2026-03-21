@@ -1,3 +1,8 @@
+import { catalogRowToOrderSkinDisplay } from '@/lib/server/catalog/mapCatalogToSkin'
+import {
+  skinRowToOrderDisplay,
+  type OrderItemSkinRow,
+} from '@/lib/server/orders/orderItemSkinDisplay'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { orderSchema, ApiResponse, Order } from '@/lib/types/order'
 
@@ -54,6 +59,14 @@ export async function GET(req: Request): Promise<Response> {
             tradable,
             isstattrak,
             issouvenir
+          ),
+          catalog_item:catalog_items (
+            id,
+            markethashname,
+            image,
+            wear,
+            list_price,
+            discount_price
           )
         ),
         customer:users (
@@ -80,13 +93,46 @@ export async function GET(req: Request): Promise<Response> {
       )
     }
 
-    // Transformar dados para o formato esperado
     const transformedOrders = orders.map((order) => ({
       ...order,
-      items: order.order_items.map((item: Record<string, unknown>) => ({
-        ...item,
-        skin: item.skin,
-      })),
+      items: order.order_items.map((item: Record<string, unknown>) => {
+        const skin = item.skin as Record<string, unknown> | null
+        const cat = item.catalog_item as Record<string, unknown> | null
+        const displaySkin = skin
+          ? skinRowToOrderDisplay(skin as OrderItemSkinRow)
+          : cat
+            ? catalogRowToOrderSkinDisplay({
+                id: String(cat.id),
+                markethashname: String(cat.markethashname),
+                image: String(cat.image),
+                wear: (cat.wear as string | null) ?? '',
+                list_price: cat.list_price as string | number | null,
+                discount_price: cat.discount_price as string | number | null,
+              })
+            : {
+                id: String(item.skin_id ?? item.catalog_item_id ?? ''),
+                markethashname: 'Item não encontrado',
+                image: '/placeholder-skin.jpg',
+                wear: '',
+                price: '0',
+                discount_price: '0',
+                tradable: false,
+                isstattrak: false,
+                issouvenir: false,
+              }
+
+        return {
+          id: item.id,
+          order_id: item.order_id,
+          skin_id: (item.skin_id as string | null) ?? null,
+          catalog_item_id: (item.catalog_item_id as string | null) ?? null,
+          quantity: item.quantity as number,
+          unit_price: item.unit_price,
+          total_price: item.total_price,
+          created_at: item.created_at as string,
+          skin: displaySkin,
+        }
+      }),
     }))
 
     // Remover order_items já que foi transformado em items

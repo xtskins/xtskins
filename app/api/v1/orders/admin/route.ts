@@ -1,3 +1,8 @@
+import { buildSkinDisplayForOrderItem } from '@/lib/server/orders/orderItemSkinDisplay'
+import {
+  type CatalogPriceRow,
+  type SkinPriceRow,
+} from '@/lib/server/orders/resolveOrderLines'
 import { getSupabaseServiceRoleKey } from '@/lib/supabase/env'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { orderSchema, ApiResponse, Order } from '@/lib/types/order'
@@ -110,6 +115,7 @@ export async function GET(req: Request): Promise<Response> {
         id,
         order_id,
         skin_id,
+        catalog_item_id,
         quantity,
         unit_price,
         total_price,
@@ -139,12 +145,17 @@ export async function GET(req: Request): Promise<Response> {
     const supabaseService = createServerSupabaseClient(
       getSupabaseServiceRoleKey()!,
     )
-    const skinIds = orderItems?.map((item) => item.skin_id) || []
+    const skinIds =
+      orderItems?.map((item) => item.skin_id).filter(Boolean) as string[]
+    const catalogIds =
+      orderItems?.map((item) => item.catalog_item_id).filter(Boolean) as string[]
 
-    const { data: skins, error: skinsError } = await supabaseService
-      .from('skins')
-      .select(
-        `
+    const [skinsResult, catalogsResult] = await Promise.all([
+      skinIds.length
+        ? supabaseService
+            .from('skins')
+            .select(
+              `
         id,
         markethashname,
         image,
@@ -155,22 +166,35 @@ export async function GET(req: Request): Promise<Response> {
         isstattrak,
         issouvenir
       `,
-      )
-      .in('id', skinIds)
+            )
+            .in('id', skinIds)
+        : Promise.resolve({ data: [] as SkinPriceRow[], error: null }),
+      catalogIds.length
+        ? supabaseService
+            .from('catalog_items')
+            .select(
+              'id, markethashname, marketname, image, wear, list_price, discount_price',
+            )
+            .in('id', catalogIds)
+        : Promise.resolve({ data: [] as CatalogPriceRow[], error: null }),
+    ])
 
-    if (skinsError) {
-      console.error('Erro ao buscar skins:', skinsError)
+    if (skinsResult.error || catalogsResult.error) {
+      console.error('Erro ao buscar itens:', skinsResult.error, catalogsResult.error)
       return new Response(
         JSON.stringify({
           success: false,
           error: {
-            message: 'Erro ao buscar skins',
+            message: 'Erro ao buscar dados dos itens do pedido',
             code: 'DATABASE_ERROR',
           },
         }),
         { status: 500, headers: { 'Content-Type': 'application/json' } },
       )
     }
+
+    const skins = skinsResult.data || []
+    const catalogs = catalogsResult.data || []
 
     // Buscar dados dos usuários
     const userIds = orders.map((order) => order.user_id)
@@ -199,8 +223,12 @@ export async function GET(req: Request): Promise<Response> {
       )
     }
 
-    // Criar maps para acesso rápido
-    const skinsMap = new Map(skins?.map((skin) => [skin.id, skin]) || [])
+    const skinsMap = new Map(
+      (skins as SkinPriceRow[]).map((skin) => [skin.id, skin]),
+    )
+    const catalogsMap = new Map(
+      (catalogs as CatalogPriceRow[]).map((c) => [c.id, c]),
+    )
     const usersMap = new Map(users?.map((user) => [user.id, user]) || [])
 
     // Transformar dados para o formato esperado
@@ -216,30 +244,17 @@ export async function GET(req: Request): Promise<Response> {
           email: 'Email não encontrado',
           name: 'Nome não encontrado',
         },
-        items: orderItemsForOrder.map((item) => {
-          const skinData = skinsMap.get(item.skin_id)
-
-          return {
-            ...item,
-            skin: skinData
-              ? {
-                  ...skinData,
-                  price: String(skinData.price),
-                  discount_price: String(skinData.discount_price),
-                }
-              : {
-                  id: item.skin_id,
-                  markethashname: 'Skin não encontrada',
-                  image: '/placeholder-skin.jpg',
-                  wear: 'Unknown',
-                  price: '0',
-                  discount_price: '0',
-                  tradable: false,
-                  isstattrak: false,
-                  issouvenir: false,
-                },
-          }
-        }),
+        items: orderItemsForOrder.map((item) => ({
+          ...item,
+          skin: buildSkinDisplayForOrderItem(
+            {
+              skin_id: item.skin_id,
+              catalog_item_id: item.catalog_item_id,
+            },
+            skinsMap,
+            catalogsMap,
+          ),
+        })),
       }
     })
 

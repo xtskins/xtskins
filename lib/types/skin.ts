@@ -113,6 +113,7 @@ export const skinSchema = z.object({
   count: z.number(),
   created_at: z.string(),
   updated_at: z.string(),
+  listing_source: z.enum(['inventory', 'catalog']).default('inventory'),
 })
 
 export type ExternalSkinData = z.infer<typeof externalSkinDataSchema>

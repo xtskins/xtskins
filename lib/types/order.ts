@@ -4,7 +4,11 @@ import { z } from 'zod'
 export const orderItemSchema = z.object({
   id: z.string(),
   order_id: z.string(),
-  skin_id: z.string(),
+  skin_id: z.string().nullable(),
+  catalog_item_id: z
+    .union([z.string(), z.null()])
+    .optional()
+    .transform((v) => v ?? null),
   quantity: z.number().min(1).default(1),
   unit_price: z.union([z.string(), z.number()]).transform((val) => String(val)),
   total_price: z

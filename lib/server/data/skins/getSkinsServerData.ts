@@ -1,5 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
+import { mapCatalogRowToSkin } from '@/lib/server/catalog/mapCatalogToSkin'
 import { getSupabaseServiceRoleKey, getSupabaseUrl } from '@/lib/supabase/env'
+import { catalogItemRowSchema } from '@/lib/types/catalog'
 import { SkinType, Skin, skinSchema } from '@/lib/types/skin'
 
 export async function getSkinsServerData() {
@@ -10,19 +12,20 @@ export async function getSkinsServerData() {
       getSupabaseServiceRoleKey()!,
     )
 
-    const { data } = await supabase
-      .from('skins')
-      .select('type, sub_type')
-      .eq('is_visible', true)
+    const [{ data: invData }, { data: catData }] = await Promise.all([
+      supabase.from('skins').select('type, sub_type').eq('is_visible', true),
+      supabase
+        .from('catalog_items')
+        .select('type, sub_type')
+        .eq('is_visible', true),
+    ])
 
-    if (!data) {
-      return { skinTypes: [] }
-    }
+    const rows = [...(invData || []), ...(catData || [])]
 
     // Agrupa os tipos e sub_tipos
     const typeMap = new Map<string, Set<string>>()
 
-    data.forEach((skin) => {
+    rows.forEach((skin) => {
       // Verifica se type e sub_type não são null e não são strings vazias
       if (
         skin.type &&
@@ -60,23 +63,26 @@ export async function getAllSkinsServerData() {
       getSupabaseServiceRoleKey()!,
     )
 
-    const { data, error } = await supabase
-      .from('skins')
-      .select('*')
-      .eq('is_visible', true)
+    const [{ data: invSkins, error: invError }, { data: catRows, error: catError }] =
+      await Promise.all([
+        supabase.from('skins').select('*').eq('is_visible', true),
+        supabase
+          .from('catalog_items')
+          .select('*')
+          .eq('is_visible', true)
+          .order('sort_order', { ascending: false }),
+      ])
 
-    if (error) {
-      console.error('Erro no banco:', error)
-      return { skins: [] }
+    if (invError) {
+      console.error('Erro no banco (skins):', invError)
     }
-
-    if (!data) {
-      return { skins: [] }
+    if (catError) {
+      console.error('Erro no banco (catalog_items):', catError)
     }
 
     const validatedSkins: Skin[] = []
 
-    for (const skin of data) {
+    for (const skin of invSkins || []) {
       try {
         const validatedSkin = skinSchema.parse(skin)
         validatedSkins.push(validatedSkin)
@@ -86,7 +92,18 @@ export async function getAllSkinsServerData() {
           markethashname: skin.markethashname,
           error: error instanceof Error ? error.message : error,
         })
-        // Continua sem esta skin
+      }
+    }
+
+    for (const row of catRows || []) {
+      try {
+        const cat = catalogItemRowSchema.parse(row)
+        validatedSkins.push(mapCatalogRowToSkin(cat))
+      } catch (error) {
+        console.error('Erro ao validar catalog_item:', {
+          id: row.id,
+          error: error instanceof Error ? error.message : error,
+        })
       }
     }
 

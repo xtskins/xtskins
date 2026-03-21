@@ -1,40 +1,13 @@
-import { createClient } from '@supabase/supabase-js'
-import { getSupabaseServiceRoleKey, getSupabaseUrl } from '@/lib/supabase/env'
-import { ApiResponse, Skin, skinSchema } from '@/lib/types/skin'
+import { getAllSkinsServerData } from '@/lib/server/data/skins/getSkinsServerData'
+import { ApiResponse, Skin } from '@/lib/types/skin'
 
 export async function GET(): Promise<Response> {
   try {
-    // Usa service_role key para acessar todas as skins
-    const supabase = createClient(
-      getSupabaseUrl()!,
-      getSupabaseServiceRoleKey()!,
-    )
-
-    const { data, error } = await supabase
-      .from('skins')
-      .select('*')
-      .eq('is_visible', true)
-      .order('created_at', { ascending: false })
-
-    if (error) {
-      console.error('Erro no banco:', error)
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: {
-            message: 'Erro ao buscar skins',
-            code: 'DATABASE_ERROR',
-          },
-        }),
-        { status: 500, headers: { 'Content-Type': 'application/json' } },
-      )
-    }
-
-    const validatedSkins = data.map((skin) => skinSchema.parse(skin))
+    const { skins } = await getAllSkinsServerData()
 
     const result: ApiResponse<Skin[]> = {
       success: true,
-      data: validatedSkins,
+      data: skins,
     }
 
     return new Response(JSON.stringify(result), {

@@ -1,6 +1,14 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getSupabaseServiceRoleKey, getSupabaseUrl } from '@/lib/supabase/env'
 import { createClient } from '@supabase/supabase-js'
+import { buildSkinDisplayForOrderItem } from '@/lib/server/orders/orderItemSkinDisplay'
+import {
+  resolveProductLines,
+  unitPriceFromLine,
+  listPriceFromLine,
+  type SkinPriceRow,
+  type CatalogPriceRow,
+} from '@/lib/server/orders/resolveOrderLines'
 import {
   createOrderSchema,
   orderSchema,
@@ -47,30 +55,38 @@ export async function POST(req: Request): Promise<Response> {
       )
     }
 
-    // Buscar dados das skins e calcular valores
-    const skinIds = validatedData.items.map((item) => item.skin_id)
+    // skin_id no payload = id da linha na vitrine (skins OU catalog_items)
+    const productIds = validatedData.items.map((item) => item.skin_id)
 
-    // Usar service_role_key para acessar skins da loja (que pertencem ao admin)
-    // As políticas RLS impedem usuários de ver skins de outros usuários
     const supabaseAdmin = createClient(
       getSupabaseUrl()!,
       getSupabaseServiceRoleKey()!,
     )
 
-    const { data: skins, error: skinsError } = await supabaseAdmin
-      .from('skins')
-      .select(
-        'id, markethashname, image, wear, discount_price, price, tradable, isstattrak, issouvenir',
-      )
-      .in('id', skinIds)
-      .eq('is_visible', true)
+    const [{ data: skins, error: skinsError }, { data: catalogs, error: catError }] =
+      await Promise.all([
+        supabaseAdmin
+          .from('skins')
+          .select(
+            'id, markethashname, image, wear, discount_price, price, tradable, isstattrak, issouvenir',
+          )
+          .in('id', productIds)
+          .eq('is_visible', true),
+        supabaseAdmin
+          .from('catalog_items')
+          .select(
+            'id, markethashname, marketname, image, wear, list_price, discount_price',
+          )
+          .in('id', productIds)
+          .eq('is_visible', true),
+      ])
 
-    if (skinsError || !skins) {
+    if (skinsError || catError) {
       return new Response(
         JSON.stringify({
           success: false,
           error: {
-            message: 'Erro ao buscar informações das skins',
+            message: 'Erro ao buscar itens da vitrine',
             code: 'DATABASE_ERROR',
           },
         }),
@@ -78,36 +94,33 @@ export async function POST(req: Request): Promise<Response> {
       )
     }
 
-    // Verificar se todas as skins existem
-    if (skins.length !== skinIds.length) {
-      const foundSkinIds = skins.map((skin) => skin.id)
-      const missingSkinIds = skinIds.filter((id) => !foundSkinIds.includes(id))
+    const { map: lineMap, missing } = resolveProductLines(
+      productIds,
+      (skins || []) as SkinPriceRow[],
+      (catalogs || []) as CatalogPriceRow[],
+    )
 
-      console.error('Skins não encontradas:', {
-        missingSkinIds,
-        skinsFound: skins.length,
-        skinsRequested: skinIds.length,
-      })
-
+    if (missing.length > 0) {
+      console.error('Itens não encontrados na vitrine:', { missing })
       return new Response(
         JSON.stringify({
           success: false,
           error: {
-            message: `Uma ou mais skins não foram encontradas. IDs não encontrados: ${missingSkinIds.join(', ')}`,
+            message: `Um ou mais itens não foram encontrados ou não estão visíveis. IDs: ${missing.join(', ')}`,
             code: 'VALIDATION_ERROR',
-            details: {
-              missingSkinIds,
-              foundCount: skins.length,
-              requestedCount: skinIds.length,
-            },
+            details: { missingIds: missing },
           },
         }),
         { status: 400, headers: { 'Content-Type': 'application/json' } },
       )
     }
 
-    // Criar um mapa de skins para fácil acesso
-    const skinsMap = new Map(skins.map((skin) => [skin.id, skin]))
+    const skinRowsMap = new Map<string, SkinPriceRow>()
+    const catalogRowsMap = new Map<string, CatalogPriceRow>()
+    for (const line of lineMap.values()) {
+      if (line.kind === 'skin') skinRowsMap.set(line.row.id, line.row)
+      else catalogRowsMap.set(line.row.id, line.row)
+    }
 
     // Calcular valores
     let totalAmount = 0
@@ -131,9 +144,8 @@ export async function POST(req: Request): Promise<Response> {
       // Calcular o total sem cupom primeiro
       let subtotal = 0
       validatedData.items.forEach((item) => {
-        const skin = skinsMap.get(item.skin_id)!
-        const unitPrice = parseFloat(skin.discount_price || skin.price || '0')
-        subtotal += unitPrice * item.quantity
+        const line = lineMap.get(item.skin_id)!
+        subtotal += unitPriceFromLine(line) * item.quantity
       })
 
       // Validar cupom com o valor do pedido
@@ -222,22 +234,22 @@ export async function POST(req: Request): Promise<Response> {
 
     // Criar os itens do pedido
     const orderItems = validatedData.items.map((item) => {
-      const skin = skinsMap.get(item.skin_id)!
-      const unitPrice = parseFloat(skin.discount_price || skin.price || '0')
+      const line = lineMap.get(item.skin_id)!
+      const unitPrice = unitPriceFromLine(line)
       const itemTotal = unitPrice * item.quantity
 
       totalAmount += itemTotal
 
-      // Calcular desconto das skins (diferença entre preço original e preço com desconto)
-      const originalPrice = parseFloat(skin.price || '0')
-      const discountPrice = parseFloat(skin.discount_price || skin.price || '0')
-      if (originalPrice > discountPrice) {
-        discountAmount += (originalPrice - discountPrice) * item.quantity
+      const originalPrice = listPriceFromLine(line)
+      const salePrice = unitPrice
+      if (originalPrice > salePrice) {
+        discountAmount += (originalPrice - salePrice) * item.quantity
       }
 
       return {
         order_id: order.id,
-        skin_id: item.skin_id,
+        skin_id: line.kind === 'skin' ? line.row.id : null,
+        catalog_item_id: line.kind === 'catalog' ? line.row.id : null,
         quantity: item.quantity,
         unit_price: unitPrice,
         total_price: itemTotal,
@@ -366,24 +378,17 @@ export async function POST(req: Request): Promise<Response> {
       )
     }
 
-    // Construir os itens com dados das skins (já temos no skinsMap)
-    const itemsWithSkins = createdOrderItems.map((item) => {
-      const skinData = skinsMap.get(item.skin_id)!
-      return {
-        ...item,
-        skin: {
-          id: skinData.id,
-          markethashname: skinData.markethashname,
-          image: skinData.image,
-          wear: skinData.wear,
-          discount_price: String(skinData.discount_price || skinData.price),
-          price: String(skinData.price),
-          tradable: skinData.tradable,
-          isstattrak: skinData.isstattrak,
-          issouvenir: skinData.issouvenir,
+    const itemsWithSkins = createdOrderItems.map((item) => ({
+      ...item,
+      skin: buildSkinDisplayForOrderItem(
+        {
+          skin_id: item.skin_id,
+          catalog_item_id: item.catalog_item_id,
         },
-      }
-    })
+        skinRowsMap,
+        catalogRowsMap,
+      ),
+    }))
 
     // Buscar pedido atualizado
     const { data: finalOrder, error: finalOrderError } = await supabase

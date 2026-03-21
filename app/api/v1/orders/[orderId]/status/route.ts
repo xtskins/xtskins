@@ -1,3 +1,8 @@
+import { buildSkinDisplayForOrderItem } from '@/lib/server/orders/orderItemSkinDisplay'
+import {
+  type CatalogPriceRow,
+  type SkinPriceRow,
+} from '@/lib/server/orders/resolveOrderLines'
 import { getSupabaseServiceRoleKey } from '@/lib/supabase/env'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import {
@@ -152,6 +157,7 @@ export async function PATCH(
         id,
         order_id,
         skin_id,
+        catalog_item_id,
         quantity,
         unit_price,
         total_price,
@@ -179,12 +185,17 @@ export async function PATCH(
       getSupabaseServiceRoleKey()!,
     )
 
-    const skinIds = orderItems?.map((item) => item.skin_id) || []
-    const [skinsResult, userResult] = await Promise.all([
-      supabaseService
-        .from('skins')
-        .select(
-          `
+    const skinIds =
+      orderItems?.map((item) => item.skin_id).filter(Boolean) as string[]
+    const catalogIds =
+      orderItems?.map((item) => item.catalog_item_id).filter(Boolean) as string[]
+
+    const [skinsResult, catalogsResult, userResult] = await Promise.all([
+      skinIds.length
+        ? supabaseService
+            .from('skins')
+            .select(
+              `
           id,
           markethashname,
           image,
@@ -195,8 +206,17 @@ export async function PATCH(
           isstattrak,
           issouvenir
         `,
-        )
-        .in('id', skinIds),
+            )
+            .in('id', skinIds)
+        : Promise.resolve({ data: [] as SkinPriceRow[], error: null }),
+      catalogIds.length
+        ? supabaseService
+            .from('catalog_items')
+            .select(
+              'id, markethashname, marketname, image, wear, list_price, discount_price',
+            )
+            .in('id', catalogIds)
+        : Promise.resolve({ data: [] as CatalogPriceRow[], error: null }),
       supabaseService
         .from('users')
         .select(
@@ -210,13 +230,17 @@ export async function PATCH(
         .single(),
     ])
 
-    if (skinsResult.error) {
-      console.error('Erro ao buscar skins:', skinsResult.error)
+    if (skinsResult.error || catalogsResult.error) {
+      console.error(
+        'Erro ao buscar itens:',
+        skinsResult.error,
+        catalogsResult.error,
+      )
       return new Response(
         JSON.stringify({
           success: false,
           error: {
-            message: 'Erro ao buscar skins',
+            message: 'Erro ao buscar dados dos itens',
             code: 'DATABASE_ERROR',
           },
         }),
@@ -238,12 +262,19 @@ export async function PATCH(
       )
     }
 
-    // Criar maps para acesso rápido
     const skinsMap = new Map(
-      skinsResult.data?.map((skin) => [skin.id, skin]) || [],
+      (skinsResult.data as SkinPriceRow[] | null)?.map((skin) => [
+        skin.id,
+        skin,
+      ]) || [],
+    )
+    const catalogsMap = new Map(
+      (catalogsResult.data as CatalogPriceRow[] | null)?.map((c) => [
+        c.id,
+        c,
+      ]) || [],
     )
 
-    // Transformar dados para o formato esperado
     const transformedOrder = {
       ...updatedOrder,
       customer: userResult.data || {
@@ -251,30 +282,17 @@ export async function PATCH(
         email: 'Email não encontrado',
         name: 'Nome não encontrado',
       },
-      items: (orderItems || []).map((item) => {
-        const skinData = skinsMap.get(item.skin_id)
-
-        return {
-          ...item,
-          skin: skinData
-            ? {
-                ...skinData,
-                price: String(skinData.price),
-                discount_price: String(skinData.discount_price),
-              }
-            : {
-                id: item.skin_id,
-                markethashname: 'Skin não encontrada',
-                image: '/placeholder-skin.jpg',
-                wear: 'Unknown',
-                price: '0',
-                discount_price: '0',
-                tradable: false,
-                isstattrak: false,
-                issouvenir: false,
-              },
-        }
-      }),
+      items: (orderItems || []).map((item) => ({
+        ...item,
+        skin: buildSkinDisplayForOrderItem(
+          {
+            skin_id: item.skin_id,
+            catalog_item_id: item.catalog_item_id,
+          },
+          skinsMap,
+          catalogsMap,
+        ),
+      })),
     }
 
     const validatedOrder = orderSchema.parse(transformedOrder)
