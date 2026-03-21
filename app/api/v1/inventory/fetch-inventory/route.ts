@@ -5,10 +5,43 @@ import {
   getExchangeRate,
 } from '@/lib/types/skin'
 import { SteamAuthService } from '@/lib/steam/steam-auth-service'
+import { fetchPublicSteamCs2Inventory } from '@/lib/steam/community-inventory'
 import { invalidateSkinsAndRevalidate } from '@/lib/server/cache/skins-cache'
 import { z } from 'zod'
 
-const STEAM_API_KEY = process.env.STEAM_API_KEY || 'NV0Z3WKMXLZN1X3Q'
+/** Só steamwebapi.com; sem variável, usamos só inventário público (community JSON). */
+function getSteamWebApiComKey(): string | null {
+  const k = process.env.STEAM_API_KEY?.trim()
+  return k || null
+}
+
+async function fetchInventoryFromSteamWebApi(
+  steamId: string,
+  steamLoginSecure: string,
+): Promise<unknown[] | null> {
+  const key = getSteamWebApiComKey()
+  if (!key) return null
+
+  const steamApiUrl = new URL(
+    'https://www.steamwebapi.com/steam/api/inventory',
+  )
+  steamApiUrl.searchParams.append('key', key)
+  steamApiUrl.searchParams.append('steam_id', steamId)
+  steamApiUrl.searchParams.append('steam_login_secure', steamLoginSecure)
+  steamApiUrl.searchParams.append('no_cache', '1')
+
+  const steamResponse = await fetch(steamApiUrl.toString(), {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      'User-Agent': 'XTSkins/1.0',
+    },
+  })
+
+  if (!steamResponse.ok) return null
+  const steamData: unknown = await steamResponse.json()
+  return Array.isArray(steamData) ? steamData : null
+}
 
 export async function POST(req: Request): Promise<Response> {
   try {
@@ -95,90 +128,110 @@ export async function POST(req: Request): Promise<Response> {
 
     const steamId = userProfile.steam_id
 
-    // Sempre obter um token fresco do SteamAuthService
-    console.log(
-      '🔑 [STEAM_AUTH] Starting Steam authentication process for steamId:',
+    const communityOnly =
+      process.env.INVENTORY_USE_STEAM_COMMUNITY_ONLY === 'true'
+
+    let steamData: unknown[] | null = null
+    let inventorySource: 'steamwebapi' | 'steam_community_public' | null = null
+    let hadSteamLoginSecure = false
+    let webApiAuthError: string | undefined
+
+    if (!communityOnly && getSteamWebApiComKey()) {
+      const steamAuth = SteamAuthService.getInstance()
+      const authResult = await steamAuth.getSteamLoginSecure(accessToken)
+
+      if (authResult.success && authResult.steamLoginSecure) {
+        hadSteamLoginSecure = true
+        steamData = await fetchInventoryFromSteamWebApi(
+          steamId,
+          authResult.steamLoginSecure,
+        )
+        if (steamData?.length) inventorySource = 'steamwebapi'
+      } else {
+        webApiAuthError = authResult.error
+        console.log(
+          '[inventory] steam_login_secure indisponível, tentando inventário público:',
+          authResult.error,
+        )
+      }
+    }
+
+    if (!steamData?.length) {
+      try {
+        const publicSkins = await fetchPublicSteamCs2Inventory(steamId)
+        steamData = publicSkins
+        inventorySource = 'steam_community_public'
+      } catch (pubErr) {
+        const pubMsg =
+          pubErr instanceof Error ? pubErr.message : 'Falha inventário público'
+
+        if (communityOnly || !getSteamWebApiComKey()) {
+          return new Response(
+            JSON.stringify({
+              success: false,
+              error: {
+                message: pubMsg,
+                code: 'STEAM_COMMUNITY_INVENTORY_ERROR',
+              },
+            }),
+            { status: 400, headers: { 'Content-Type': 'application/json' } },
+          )
+        }
+
+        if (!hadSteamLoginSecure) {
+          return new Response(
+            JSON.stringify({
+              success: false,
+              error: {
+                message: `Inventário público: ${pubMsg}. Login Steam (QR): ${webApiAuthError ?? 'sem token'}.`,
+                code: 'STEAM_AUTH_AND_PUBLIC_FAILED',
+                details: { publicError: pubMsg, authError: webApiAuthError },
+              },
+            }),
+            { status: 400, headers: { 'Content-Type': 'application/json' } },
+          )
+        }
+
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: {
+              message: `Inventário público: ${pubMsg}. Com steam_login_secure a API externa não retornou itens; verifique STEAM_API_KEY e conta steamwebapi.com.`,
+              code: 'STEAM_API_EMPTY_OR_FAILED',
+              details: { publicError: pubMsg },
+            },
+          }),
+          { status: 502, headers: { 'Content-Type': 'application/json' } },
+        )
+      }
+    }
+
+    const response = await processInventoryData(
+      steamData,
+      supabase,
+      userData,
       steamId,
     )
 
-    const steamAuth = SteamAuthService.getInstance()
-    console.log('🔑 [STEAM_AUTH] SteamAuthService instance obtained')
-
-    const authResult = await steamAuth.getSteamLoginSecure(accessToken)
-
-    console.log('🔑 [STEAM_AUTH] Authentication result:', {
-      success: authResult.success,
-      hasToken: !!authResult.steamLoginSecure,
-      tokenPreview: authResult.steamLoginSecure,
-      error: authResult.error,
-    })
-
-    if (!authResult.success) {
-      console.log(
-        '❌ [STEAM_AUTH] Steam authentication failed:',
-        authResult.error,
-      )
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: {
-            message: `Erro ao obter steam_login_secure: ${authResult.error}`,
-            code: 'STEAM_AUTH_ERROR',
-            details: authResult.error,
-          },
-        }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } },
-      )
+    if (inventorySource === 'steam_community_public' && response.ok) {
+      const clone = response.clone()
+      const body = await clone.json()
+      const next = {
+        ...body,
+        data: {
+          ...(body.data ?? {}),
+          inventorySource: 'steam_community_public',
+          note:
+            'Preços podem estar zerados; defina manualmente ou use login Steam + steamwebapi.com para preços automáticos.',
+        },
+      }
+      return new Response(JSON.stringify(next), {
+        status: response.status,
+        headers: { 'Content-Type': 'application/json' },
+      })
     }
 
-    const steamLoginSecure = authResult.steamLoginSecure!
-    console.log(
-      '🔑 [STEAM_AUTH] steamLoginSecure will be used in API:',
-      steamLoginSecure,
-    )
-
-    // Montar a URL da API externa
-    const steamApiUrl = new URL(
-      'https://www.steamwebapi.com/steam/api/inventory',
-    )
-    steamApiUrl.searchParams.append('key', STEAM_API_KEY)
-    steamApiUrl.searchParams.append('steam_id', steamId)
-    steamApiUrl.searchParams.append('steam_login_secure', steamLoginSecure)
-    steamApiUrl.searchParams.append('no_cache', '1')
-
-    // Fazer a requisição para a API externa
-    const steamResponse = await fetch(steamApiUrl.toString(), {
-      method: 'GET',
-      headers: {
-        Accept: 'application/json',
-        'User-Agent': 'XTSkins/1.0',
-      },
-    })
-
-    if (!steamResponse.ok) {
-      const errorText = await steamResponse.text()
-
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: {
-            message: `Erro ao buscar inventário do Steam: ${steamResponse.status}`,
-            code: 'STEAM_API_ERROR',
-            details: {
-              status: steamResponse.status,
-              statusText: steamResponse.statusText,
-              responseBody: errorText,
-              steamLoginSecureUsed: steamLoginSecure.substring(0, 20) + '...',
-            },
-          },
-        }),
-        { status: 500, headers: { 'Content-Type': 'application/json' } },
-      )
-    }
-
-    const steamData = await steamResponse.json()
-
-    return await processInventoryData(steamData, supabase, userData, steamId)
+    return response
   } catch (error) {
     console.error('Erro no endpoint de inventário:', error)
 
