@@ -2,8 +2,6 @@ import { WelcomeEmailTemplate } from '@/components/email-template'
 import { Resend } from 'resend'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
-
 export async function POST(request: Request) {
   try {
     const { headers } = request
@@ -50,6 +48,7 @@ export async function POST(request: Request) {
       )
     }
 
+    const resend = new Resend(process.env.RESEND_API_KEY)
     const { data, error } = await resend.emails.send({
       from: process.env.RESEND_FROM_EMAIL || 'XTSkins <onboarding@resend.dev>',
       to: [email],

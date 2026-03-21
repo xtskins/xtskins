@@ -4,6 +4,8 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  // steam-session → bytebuffer tenta resolver `memcpy` (addon nativo) no bundle; manter no node_modules em runtime
+  serverExternalPackages: ['steam-session', 'bytebuffer', 'websocket13'],
   images: {
     remotePatterns: [
       {
