@@ -18,8 +18,6 @@ export const catalogItemRowSchema = z.object({
   updated_at: z.string(),
 })
 
-export type CatalogItemRow = z.infer<typeof catalogItemRowSchema>
-
 export const createCatalogItemSchema = z.object({
   markethashname: z.string().min(1),
   marketname: z.string().min(1),
@@ -36,3 +34,7 @@ export const createCatalogItemSchema = z.object({
 })
 
 export const updateCatalogItemSchema = createCatalogItemSchema.partial()
+
+export type CatalogItemRow = z.infer<typeof catalogItemRowSchema>
+export type CreateCatalogItemInput = z.infer<typeof createCatalogItemSchema>
+export type UpdateCatalogItemInput = z.infer<typeof updateCatalogItemSchema>

@@ -1,6 +1,6 @@
 'use client'
 
-import { Package2, UserLock, Ticket } from 'lucide-react'
+import { Package2, UserLock, Ticket, Store } from 'lucide-react'
 import { Button } from '../ui/button'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
@@ -87,6 +87,12 @@ export default function AdminArea({
             >
               <Ticket className="h-4 w-4 text-white" /> Cupons
             </Button>
+            <Button
+              className="bg-primary mt-2 w-full text-white"
+              onClick={() => router.push('/admin/catalogo')}
+            >
+              <Store className="h-4 w-4 text-white" /> Catálogo
+            </Button>
           </div>
         </div>
 
@@ -118,6 +124,16 @@ export default function AdminArea({
             onClick={() => router.push('/admin/cupons')}
           >
             <Ticket className="h-4 w-4 text-white" />
+          </Button>
+        </div>
+        <div className="hidden group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9"
+            onClick={() => router.push('/admin/catalogo')}
+          >
+            <Store className="h-4 w-4 text-white" />
           </Button>
         </div>
       </div>
