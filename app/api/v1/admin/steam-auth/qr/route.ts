@@ -26,7 +26,7 @@ function readEresult(err: unknown): number | undefined {
 function describeSteamQrFailure(eresult: number | undefined, err: unknown): string {
   // k_EResultFileNotFound — na doc do steam-session: login recusado no mobile OU sessão inválida/expirada
   if (eresult === 9) {
-    return 'A Steam devolveu o código 9 (sessão não encontrada). Isso pode ocorrer sem você tocar no app: atraso nos servidores da Steam, rede ou primeiro poll muito cedo. Também ocorre se você recusou o login, se o QR expirou ou se abriu outro QR. Use "Tentar novamente"; no celular toque em Aprovar quando aparecer o pedido.'
+    return 'Código 9: o servidor ainda não conseguiu acompanhar a sessão no poll (comum enquanto o app mostra o pedido). O Steam Mobile pode abrir esse pedido sozinho (notificação), sem você escanear o QR. Use "Tentar novamente" se travar; no celular toque em Aprovar. IP Ashburn/EUA no aviso é o datacenter da hospedagem (normal).'
   }
   const msg = err instanceof Error ? err.message : ''
   return msg || 'Falha na autenticação Steam. Gere um novo QR e tente de novo.'
@@ -72,6 +72,8 @@ export async function POST(req: Request): Promise<Response> {
 
     // Criar nova sessão Steam
     const session = new LoginSession(EAuthTokenPlatformType.WebBrowser)
+    // QR no celular pode levar tempo; evita timeout antes de vários polls (e retries em FileNotFound)
+    session.loginTimeout = 180_000
     const sessionId = Math.random().toString(36).substring(7)
 
     // Armazenar sessão temporariamente

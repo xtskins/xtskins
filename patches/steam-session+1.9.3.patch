@@ -1,5 +1,5 @@
 diff --git a/node_modules/steam-session/dist/LoginSession.js b/node_modules/steam-session/dist/LoginSession.js
-index 605b201..ea82cf9 100644
+index 605b201..f754778 100644
 --- a/node_modules/steam-session/dist/LoginSession.js
 +++ b/node_modules/steam-session/dist/LoginSession.js
 @@ -429,7 +429,9 @@ class LoginSession extends tiny_typed_emitter_1.TypedEmitter {
@@ -13,3 +13,29 @@ index 605b201..ea82cf9 100644
                      break;
                  case EAuthSessionGuardType_1.default.MachineToken:
                      // Do nothing here since this is handled by _attemptEmailCodeAuth
+@@ -491,11 +493,25 @@ class LoginSession extends tiny_typed_emitter_1.TypedEmitter {
+         let pollResponse;
+         try {
+             pollResponse = await this._handler.pollLoginStatus(this._startSessionResponse);
++            this._pollFnfRetries = 0;
+             this.emit('debug', 'poll response', pollResponse);
+         }
+         catch (ex) {
+             // If we got an error, but we've already canceled polling, just do nothing.
+             if (!this._pollingCanceled) {
++                const eresult = ex && typeof ex === 'object' && 'eresult' in ex
++                    ? ex.eresult
++                    : undefined;
++                // XTSkins: Steam costuma devolver FileNotFound (9) em polls iniciais ou durante
++                // propagação, enquanto o app mobile já mostra o pedido — não encerrar de primeira.
++                if (eresult === EResult_1.default.FileNotFound) {
++                    this._pollFnfRetries = (this._pollFnfRetries || 0) + 1;
++                    if (this._pollFnfRetries <= 15) {
++                        const delayMs = Math.min(1200 + this._pollFnfRetries * 700, 10000);
++                        this._pollTimer = setTimeout(() => this._doPoll(), delayMs);
++                        return;
++                    }
++                }
+                 this.emit('error', ex);
+                 this.cancelLoginAttempt();
+             }
