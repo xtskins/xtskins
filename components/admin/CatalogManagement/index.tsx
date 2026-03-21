@@ -187,8 +187,8 @@ export function CatalogManagement() {
           </h1>
           <p className="text-muted-foreground text-sm">
             Busque itens na Steam Web API (CS2), importe com um clique e só
-            ajuste preço e visibilidade. Mesma <code className="text-xs">STEAM_API_KEY</code>{' '}
-            do inventário.
+            ajuste preço e visibilidade. Usa a mesma variável de ambiente
+            STEAM_API_KEY do inventário.
           </p>
         </div>
         <Button variant="outline" onClick={openCreate}>
