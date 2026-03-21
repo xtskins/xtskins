@@ -1,4 +1,5 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { getSupabaseServiceRoleKey, getSupabaseUrl } from '@/lib/supabase/env'
 import { createClient } from '@supabase/supabase-js'
 import { createCouponSchema } from '@/lib/types/coupon'
 import { z } from 'zod'
@@ -61,8 +62,8 @@ export async function GET(req: Request): Promise<Response> {
 
     // Usar service role para listar todos os cupons
     const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      getSupabaseUrl()!,
+      getSupabaseServiceRoleKey()!,
     )
 
     const { data: coupons, error: couponsError } = await supabaseAdmin
@@ -178,8 +179,8 @@ export async function POST(req: Request): Promise<Response> {
 
     // Usar service role para criar cupom
     const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      getSupabaseUrl()!,
+      getSupabaseServiceRoleKey()!,
     )
 
     // Verificar se o código do cupom já existe

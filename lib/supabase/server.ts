@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { getSupabaseServiceRoleKey, getSupabaseUrl } from './env'
 
 export function createServerSupabaseClient(jwt?: string) {
   const options = jwt
@@ -11,9 +12,12 @@ export function createServerSupabaseClient(jwt?: string) {
       }
     : undefined
 
+  const url = getSupabaseUrl()
+  const serviceKey = getSupabaseServiceRoleKey()
+
   return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!, // Usar service role key para operações do servidor
+    url!,
+    serviceKey!, // service role para operações do servidor
     options,
   )
 }

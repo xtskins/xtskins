@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers'
 import { createServerClient } from '@supabase/ssr'
+import { getSupabaseAnonKey, getSupabaseUrl } from '@/lib/supabase/env'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
 export async function getAuthenticatedUser() {
@@ -8,8 +9,8 @@ export async function getAuthenticatedUser() {
 
     // Criar cliente Supabase para SSR
     const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      getSupabaseUrl()!,
+      getSupabaseAnonKey()!,
       {
         cookies: {
           getAll() {

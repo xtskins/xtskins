@@ -1,12 +1,13 @@
 import { createClient } from '@supabase/supabase-js'
+import { getSupabaseServiceRoleKey, getSupabaseUrl } from '@/lib/supabase/env'
 import { ApiResponse, Skin, skinSchema } from '@/lib/types/skin'
 
 export async function GET(): Promise<Response> {
   try {
     // Usa service_role key para acessar todas as skins
     const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      getSupabaseUrl()!,
+      getSupabaseServiceRoleKey()!,
     )
 
     const { data, error } = await supabase

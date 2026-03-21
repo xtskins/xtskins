@@ -1,4 +1,5 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { getSupabaseServiceRoleKey, getSupabaseUrl } from '@/lib/supabase/env'
 import { createClient } from '@supabase/supabase-js'
 import { updateCouponSchema } from '@/lib/types/coupon'
 import { z } from 'zod'
@@ -74,8 +75,8 @@ export async function GET(
     }
 
     const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      getSupabaseUrl()!,
+      getSupabaseServiceRoleKey()!,
     )
 
     const { data: coupon, error: couponError } = await supabaseAdmin
@@ -157,8 +158,8 @@ export async function PUT(
     }
 
     const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      getSupabaseUrl()!,
+      getSupabaseServiceRoleKey()!,
     )
 
     // Verificar se o cupom existe
@@ -285,8 +286,8 @@ export async function DELETE(
     }
 
     const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      getSupabaseUrl()!,
+      getSupabaseServiceRoleKey()!,
     )
 
     // Verificar se o cupom existe

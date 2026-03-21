@@ -1,3 +1,4 @@
+import { getSupabaseServiceRoleKey } from '@/lib/supabase/env'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { orderSchema, ApiResponse, Order } from '@/lib/types/order'
 
@@ -136,7 +137,7 @@ export async function GET(req: Request): Promise<Response> {
 
     // Buscar skins usando service_role para contornar RLS
     const supabaseService = createServerSupabaseClient(
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      getSupabaseServiceRoleKey()!,
     )
     const skinIds = orderItems?.map((item) => item.skin_id) || []
 

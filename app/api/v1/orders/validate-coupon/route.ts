@@ -1,4 +1,5 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { getSupabaseServiceRoleKey, getSupabaseUrl } from '@/lib/supabase/env'
 import { createClient } from '@supabase/supabase-js'
 import { ApiResponse } from '@/lib/types/order'
 import { z } from 'zod'
@@ -57,8 +58,8 @@ export async function POST(req: Request): Promise<Response> {
 
     // Usar service role para acessar a função de validação
     const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      getSupabaseUrl()!,
+      getSupabaseServiceRoleKey()!,
     )
 
     // Validar cupom usando a função do banco de dados

@@ -1,5 +1,6 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { getSupabaseAnonKey, getSupabaseUrl } from '@/lib/supabase/env'
 
 const ADMIN_ROUTES = ['/admin']
 const PUBLIC_ROUTES = ['/']
@@ -15,12 +16,12 @@ function nextWithRequestHeaders(request: NextRequest) {
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim()
+  const supabaseUrl = getSupabaseUrl()
+  const supabaseAnonKey = getSupabaseAnonKey()
 
   if (!supabaseUrl || !supabaseAnonKey) {
     console.error(
-      '[middleware] Supabase: defina NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY no Vercel (Production) e faça redeploy — valores são embutidos no build do middleware.',
+      '[middleware] Supabase: defina URL + chave anon (NEXT_PUBLIC_SUPABASE_* ou NEXT_PUBLIC_STORAGE_SUPABASE_* da integração Vercel) e faça redeploy.',
     )
     if (ADMIN_ROUTES.some((route) => pathname.startsWith(route))) {
       return NextResponse.redirect(new URL('/', request.url))

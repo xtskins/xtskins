@@ -1,4 +1,5 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { getSupabaseServiceRoleKey, getSupabaseUrl } from '@/lib/supabase/env'
 import { createClient } from '@supabase/supabase-js'
 import {
   createOrderSchema,
@@ -52,8 +53,8 @@ export async function POST(req: Request): Promise<Response> {
     // Usar service_role_key para acessar skins da loja (que pertencem ao admin)
     // As políticas RLS impedem usuários de ver skins de outros usuários
     const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      getSupabaseUrl()!,
+      getSupabaseServiceRoleKey()!,
     )
 
     const { data: skins, error: skinsError } = await supabaseAdmin
@@ -123,8 +124,8 @@ export async function POST(req: Request): Promise<Response> {
     if (validatedData.coupon_code) {
       // Usar service_role_key para validar cupom
       const supabaseAdmin = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        getSupabaseUrl()!,
+        getSupabaseServiceRoleKey()!,
       )
 
       // Calcular o total sem cupom primeiro
@@ -293,8 +294,8 @@ export async function POST(req: Request): Promise<Response> {
     // Registrar uso do cupom se aplicado
     if (couponData) {
       const supabaseAdmin = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        getSupabaseUrl()!,
+        getSupabaseServiceRoleKey()!,
       )
 
       // Registrar uso do cupom

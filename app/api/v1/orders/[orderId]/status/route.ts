@@ -1,3 +1,4 @@
+import { getSupabaseServiceRoleKey } from '@/lib/supabase/env'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import {
   updateOrderStatusSchema,
@@ -175,7 +176,7 @@ export async function PATCH(
 
     // Buscar skins e usuário usando service_role para contornar RLS
     const supabaseService = createServerSupabaseClient(
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      getSupabaseServiceRoleKey()!,
     )
 
     const skinIds = orderItems?.map((item) => item.skin_id) || []
