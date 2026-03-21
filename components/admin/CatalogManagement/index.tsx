@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Plus, Pencil, Store } from 'lucide-react'
+import { Loader2, Pencil, Plus, Search, Store } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
@@ -18,6 +19,8 @@ import { toast } from 'sonner'
 import {
   useCatalogItems,
   useCatalogMutations,
+  useImportSteamCatalog,
+  useSteamCatalogSearch,
   type CatalogItemRow,
 } from '@/hooks/useCatalogAdmin'
 import type {
@@ -68,6 +71,16 @@ function rowToForm(row: CatalogItemRow): CreateCatalogItemInput {
 export function CatalogManagement() {
   const { data: items = [], isLoading, error } = useCatalogItems()
   const { createMutation, updateMutation } = useCatalogMutations()
+  const importSteamMutation = useImportSteamCatalog()
+
+  const [steamQuery, setSteamQuery] = useState('')
+  const [debouncedSteamQuery, setDebouncedSteamQuery] = useState('')
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSteamQuery(steamQuery.trim()), 450)
+    return () => clearTimeout(t)
+  }, [steamQuery])
+
+  const steamSearch = useSteamCatalogSearch(debouncedSteamQuery)
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -126,6 +139,27 @@ export function CatalogManagement() {
     }
   }
 
+  const handleImportSteam = async (markethashname: string) => {
+    const r = await importSteamMutation.mutateAsync(markethashname)
+    if (r.ok) {
+      toast.success('Item importado — ajuste o preço na lista se quiser.')
+      return
+    }
+    if (r.status === 409 && r.existingId) {
+      toast.message('Já está no catálogo.')
+      const row = items.find((i) => i.id === r.existingId)
+      if (row) openEdit(row)
+      return
+    }
+    toast.error(r.message)
+  }
+
+  const openEditByHash = (markethashname: string) => {
+    const row = items.find((i) => i.markethashname === markethashname)
+    if (row) openEdit(row)
+    else toast.message('Atualize a lista ou busque de novo.')
+  }
+
   if (isLoading) {
     return (
       <div className="animate-pulse space-y-4 p-4">
@@ -152,15 +186,126 @@ export function CatalogManagement() {
             Catálogo da vitrine
           </h1>
           <p className="text-muted-foreground text-sm">
-            Itens encomendáveis (fora do inventário Steam). Aparecem na loja com
-            os preços que você definir.
+            Busque itens na Steam Web API (CS2), importe com um clique e só
+            ajuste preço e visibilidade. Mesma <code className="text-xs">STEAM_API_KEY</code>{' '}
+            do inventário.
           </p>
         </div>
-        <Button onClick={openCreate} className="text-white">
+        <Button variant="outline" onClick={openCreate}>
           <Plus className="mr-2 h-4 w-4" />
-          Novo item
+          Cadastro manual
         </Button>
       </div>
+
+      <Card className="dark:border-[#343434] dark:bg-[#232323]">
+        <CardHeader>
+          <CardTitle className="text-base">Buscar itens (Steam)</CardTitle>
+          <p className="text-muted-foreground text-sm font-normal">
+            Mínimo 3 caracteres. Preços em dólar vêm da API; na importação
+            convertemos para R$ (cotação atual ou fallback).
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="relative">
+            <Search className="text-muted-foreground absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
+            <Input
+              className="pl-9"
+              placeholder="Ex.: AK-47 Redline, AWP Asiimov..."
+              value={steamQuery}
+              onChange={(e) => setSteamQuery(e.target.value)}
+            />
+          </div>
+          {debouncedSteamQuery.length > 0 && debouncedSteamQuery.length < 3 && (
+            <p className="text-muted-foreground text-sm">
+              Digite mais caracteres para buscar.
+            </p>
+          )}
+          {steamSearch.isFetching && (
+            <div className="text-muted-foreground flex items-center gap-2 text-sm">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Buscando…
+            </div>
+          )}
+          {steamSearch.isError && (
+            <p className="text-sm text-red-600 dark:text-red-400">
+              {steamSearch.error instanceof Error
+                ? steamSearch.error.message
+                : 'Erro na busca'}
+            </p>
+          )}
+          {steamSearch.data && steamSearch.data.length === 0 && (
+            <p className="text-muted-foreground text-sm">Nenhum resultado.</p>
+          )}
+          {steamSearch.data && steamSearch.data.length > 0 && (
+            <ul className="max-h-[min(420px,50vh)] space-y-2 overflow-y-auto pr-1">
+              {steamSearch.data
+                .filter((h) => h.markethashname)
+                .map((hit) => (
+                  <li
+                    key={hit.markethashname}
+                    className="flex flex-wrap items-center gap-3 rounded-lg border p-2 dark:border-[#343434]"
+                  >
+                    {hit.image ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={hit.image}
+                        alt=""
+                        className="h-12 w-12 shrink-0 rounded border bg-muted object-cover"
+                      />
+                    ) : (
+                      <div className="h-12 w-12 shrink-0 rounded border bg-muted" />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-medium">
+                        {hit.marketname}
+                      </div>
+                      <div className="text-muted-foreground truncate text-xs">
+                        Steam ~$
+                        {hit.pricelatestUsd != null
+                          ? hit.pricelatestUsd.toFixed(2)
+                          : '—'}
+                        {hit.pricerealUsd != null
+                          ? ` · mercados ~$${hit.pricerealUsd.toFixed(2)}`
+                          : ''}
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 flex-wrap items-center gap-2">
+                      {hit.inCatalog ? (
+                        <>
+                          <Badge variant="secondary">No catálogo</Badge>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openEditByHash(hit.markethashname)}
+                          >
+                            Editar preço
+                          </Button>
+                        </>
+                      ) : (
+                        <Button
+                          type="button"
+                          size="sm"
+                          className="text-white"
+                          disabled={importSteamMutation.isPending}
+                          onClick={() =>
+                            void handleImportSteam(hit.markethashname)
+                          }
+                        >
+                          {importSteamMutation.isPending ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            'Importar'
+                          )}
+                        </Button>
+                      )}
+                    </div>
+                  </li>
+                ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
 
       <Card className="dark:border-[#343434] dark:bg-[#232323]">
         <CardHeader>

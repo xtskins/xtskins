@@ -49,4 +49,33 @@ export function useCatalogMutations() {
   return { createMutation, updateMutation }
 }
 
+export function useSteamCatalogSearch(debouncedQuery: string) {
+  return useQuery({
+    queryKey: ['admin-catalog-steam-search', debouncedQuery],
+    queryFn: async () => {
+      const res = await catalogApi.searchSteam(debouncedQuery)
+      return res.data
+    },
+    enabled: debouncedQuery.length >= 3,
+    staleTime: 60_000,
+  })
+}
+
+export function useImportSteamCatalog() {
+  const queryClient = useQueryClient()
+
+  const invalidateStorefront = async () => {
+    await invalidateSkinsServerCache()
+    queryClient.invalidateQueries({ queryKey: ['admin-catalog'] })
+  }
+
+  return useMutation({
+    mutationFn: (markethashname: string) =>
+      catalogApi.importFromSteam(markethashname),
+    onSuccess: (result) => {
+      if (result.ok) void invalidateStorefront()
+    },
+  })
+}
+
 export type { CatalogItemRow }

@@ -1,65 +1,17 @@
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { requireAdminBearer } from '@/lib/server/auth/requireAdminBearer'
 import { getSupabaseServiceRoleKey, getSupabaseUrl } from '@/lib/supabase/env'
 import { createClient } from '@supabase/supabase-js'
 import {
   updateCatalogItemSchema,
   catalogItemRowSchema,
 } from '@/lib/types/catalog'
-async function requireAdmin(req: Request) {
-  const accessToken = req.headers.get('authorization')?.replace('Bearer ', '')
-  if (!accessToken) {
-    return {
-      error: new Response(
-        JSON.stringify({
-          success: false,
-          error: { message: 'Token obrigatório', code: 'VALIDATION_ERROR' },
-        }),
-        { status: 401, headers: { 'Content-Type': 'application/json' } },
-      ),
-    }
-  }
-
-  const supabase = createServerSupabaseClient(accessToken)
-  const { data: userData, error: userError } = await supabase.auth.getUser()
-  if (userError || !userData.user) {
-    return {
-      error: new Response(
-        JSON.stringify({
-          success: false,
-          error: { message: 'Não autenticado', code: 'UNAUTHORIZED' },
-        }),
-        { status: 401, headers: { 'Content-Type': 'application/json' } },
-      ),
-    }
-  }
-
-  const { data: profile, error: profileError } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', userData.user.id)
-    .single()
-
-  if (profileError || profile?.role !== 'admin') {
-    return {
-      error: new Response(
-        JSON.stringify({
-          success: false,
-          error: { message: 'Acesso negado', code: 'FORBIDDEN' },
-        }),
-        { status: 403, headers: { 'Content-Type': 'application/json' } },
-      ),
-    }
-  }
-
-  return {}
-}
 
 export async function PATCH(
   req: Request,
   context: { params: Promise<{ catalogId: string }> },
 ): Promise<Response> {
-  const auth = await requireAdmin(req)
-  if ('error' in auth && auth.error) return auth.error
+  const auth = await requireAdminBearer(req)
+  if (!auth.ok) return auth.response
 
   const { catalogId } = await context.params
   const body = await req.json()
