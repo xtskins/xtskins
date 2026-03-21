@@ -206,6 +206,13 @@ export async function getExchangeRate(): Promise<number> {
   return 5.6 // Valor padrão
 }
 
+/** Fallback quando a tag Steam "Type" não vem (raro) — ex.: itemgroup "gloves" → "Gloves". */
+function typeFromItemGroup(itemgroup: string | undefined): string | null {
+  const g = itemgroup?.trim()
+  if (!g) return null
+  return g.charAt(0).toUpperCase() + g.slice(1).toLowerCase()
+}
+
 // Função para converter dados externos para formato do banco
 export function transformExternalSkinData(
   externalData: ExternalSkinData,
@@ -218,6 +225,11 @@ export function transformExternalSkinData(
   const weaponTag = externalData.tags?.find(
     (tag) => tag.category === 'Weapon',
   )?.localized_tag_name
+
+  // Luvas, agentes e outros itens não têm tag "Weapon"; a API já envia itemtype (ex.: "sport gloves").
+  const resolvedType = typeTag?.trim() || typeFromItemGroup(externalData.itemgroup)
+  const resolvedSubType =
+    weaponTag?.trim() || externalData.itemtype?.trim() || null
 
   // Extrair stickers e charms das descriptions
   const stickers = externalData.descriptions
@@ -253,8 +265,8 @@ export function transformExternalSkinData(
     color: externalData.color || null,
     bordercolor: externalData.bordercolor || null,
     quality: externalData.quality || null,
-    type: typeTag || null,
-    sub_type: weaponTag || null,
+    type: resolvedType || null,
+    sub_type: resolvedSubType,
     itemgroup: externalData.itemgroup || null,
     itemname: externalData.itemname || null,
     itemtype: externalData.itemtype || null,
