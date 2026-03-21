@@ -4,17 +4,38 @@ import { NextResponse, type NextRequest } from 'next/server'
 const ADMIN_ROUTES = ['/admin']
 const PUBLIC_ROUTES = ['/']
 
-export async function middleware(request: NextRequest) {
-  const response = NextResponse.next({
+function nextWithRequestHeaders(request: NextRequest) {
+  return NextResponse.next({
     request: {
       headers: request.headers,
     },
   })
+}
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
+export async function middleware(request: NextRequest) {
+  const pathname = request.nextUrl.pathname
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim()
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.error(
+      '[middleware] Supabase: defina NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY no Vercel (Production) e faça redeploy — valores são embutidos no build do middleware.',
+    )
+    if (ADMIN_ROUTES.some((route) => pathname.startsWith(route))) {
+      return NextResponse.redirect(new URL('/', request.url))
+    }
+    return nextWithRequestHeaders(request)
+  }
+
+  try {
+    const response = NextResponse.next({
+      request: {
+        headers: request.headers,
+      },
+    })
+
+    const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
       cookies: {
         get(name: string) {
           return request.cookies.get(name)?.value
@@ -34,58 +55,64 @@ export async function middleware(request: NextRequest) {
           })
         },
       },
-    },
-  )
+    })
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
-  const pathname = request.nextUrl.pathname
+    const isAdminRoute = ADMIN_ROUTES.some((route) =>
+      pathname.startsWith(route),
+    )
 
-  const isAdminRoute = ADMIN_ROUTES.some((route) => pathname.startsWith(route))
+    const isPublicRoute = PUBLIC_ROUTES.some(
+      (route) => pathname === route || pathname.startsWith(route),
+    )
 
-  const isPublicRoute = PUBLIC_ROUTES.some(
-    (route) => pathname === route || pathname.startsWith(route),
-  )
+    if (isAdminRoute) {
+      if (!user) {
+        console.log(
+          `Tentativa de acesso não autenticado à rota de admin: ${pathname}`,
+        )
+        return NextResponse.redirect(new URL('/', request.url))
+      }
 
-  if (isAdminRoute) {
-    if (!user) {
-      console.log(
-        `Tentativa de acesso não autenticado à rota de admin: ${pathname}`,
-      )
-      return NextResponse.redirect(new URL('/', request.url))
+      const { data: profile, error: profileError } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+
+      if (profileError) {
+        console.error(
+          `Erro ao buscar perfil do usuário ${user.id}:`,
+          profileError,
+        )
+        return NextResponse.redirect(new URL('/', request.url))
+      }
+
+      if (profile?.role !== 'admin') {
+        console.log(
+          `Usuário ${user.id} (role: ${profile?.role}) tentou acessar rota de admin: ${pathname}`,
+        )
+        return NextResponse.redirect(new URL('/', request.url))
+      }
+
+      console.log(`Admin ${user.id} acessou rota: ${pathname}`)
     }
 
-    const { data: profile, error: profileError } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-
-    if (profileError) {
-      console.error(
-        `Erro ao buscar perfil do usuário ${user.id}:`,
-        profileError,
-      )
-      return NextResponse.redirect(new URL('/', request.url))
+    if (!isPublicRoute && !user) {
+      console.log(`Acesso não autenticado à rota protegida: ${pathname}`)
     }
 
-    if (profile?.role !== 'admin') {
-      console.log(
-        `Usuário ${user.id} (role: ${profile?.role}) tentou acessar rota de admin: ${pathname}`,
-      )
+    return response
+  } catch (err) {
+    console.error('[middleware] falha ao executar Supabase/auth:', err)
+    if (ADMIN_ROUTES.some((route) => pathname.startsWith(route))) {
       return NextResponse.redirect(new URL('/', request.url))
     }
-
-    console.log(`Admin ${user.id} acessou rota: ${pathname}`)
+    return nextWithRequestHeaders(request)
   }
-
-  if (!isPublicRoute && !user) {
-    console.log(`Acesso não autenticado à rota protegida: ${pathname}`)
-  }
-
-  return response
 }
 
 export const config = {
