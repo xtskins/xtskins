@@ -1,0 +1,15 @@
+diff --git a/node_modules/steam-session/dist/LoginSession.js b/node_modules/steam-session/dist/LoginSession.js
+index 605b201..ea82cf9 100644
+--- a/node_modules/steam-session/dist/LoginSession.js
++++ b/node_modules/steam-session/dist/LoginSession.js
+@@ -429,7 +429,9 @@ class LoginSession extends tiny_typed_emitter_1.TypedEmitter {
+                 case EAuthSessionGuardType_1.default.EmailConfirmation:
+                     this.emit('debug', 'device or email confirmation guard required');
+                     validActions.push({ type: i.type });
+-                    setImmediate(() => this._doPoll());
++                    // XTSkins: primeiro poll imediato costuma receber EResult 9 (FileNotFound) antes da sessão
++                    // existir nos servidores Steam; pequeno atraso evita falso erro sem tocar no app.
++                    setTimeout(() => this._doPoll(), 2000);
+                     break;
+                 case EAuthSessionGuardType_1.default.MachineToken:
+                     // Do nothing here since this is handled by _attemptEmailCodeAuth

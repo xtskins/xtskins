@@ -26,7 +26,7 @@ function readEresult(err: unknown): number | undefined {
 function describeSteamQrFailure(eresult: number | undefined, err: unknown): string {
   // k_EResultFileNotFound — na doc do steam-session: login recusado no mobile OU sessão inválida/expirada
   if (eresult === 9) {
-    return 'A Steam encerrou esta tentativa (código 9). Isso acontece se você tocou em Recusar no app, se o QR expirou ou se iniciou outro login. Use "Tentar novamente" e toque em Aprovar no Steam Mobile.'
+    return 'A Steam devolveu o código 9 (sessão não encontrada). Isso pode ocorrer sem você tocar no app: atraso nos servidores da Steam, rede ou primeiro poll muito cedo. Também ocorre se você recusou o login, se o QR expirou ou se abriu outro QR. Use "Tentar novamente"; no celular toque em Aprovar quando aparecer o pedido.'
   }
   const msg = err instanceof Error ? err.message : ''
   return msg || 'Falha na autenticação Steam. Gere um novo QR e tente de novo.'
