@@ -98,13 +98,16 @@ export async function GET(req: Request): Promise<Response> {
 
     const session = activeSessions.get(sessionId)
 
+    // Em serverless (ex.: Vercel), POST e GET podem cair em instâncias diferentes;
+    // o Map em memória não é compartilhado. "Sessão ausente" NÃO significa concluída.
+    // O cliente continua em pending e usa /steam-auth/check (DB) como fonte da verdade.
     if (!session) {
       return new Response(
         JSON.stringify({
           success: true,
           data: {
-            status: 'completed', // Sessão não existe = já foi processada
-            authenticated: true,
+            status: 'pending',
+            authenticated: false,
           },
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
