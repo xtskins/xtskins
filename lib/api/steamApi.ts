@@ -25,8 +25,10 @@ interface QRAuthResponse {
 interface AuthStatusResponse {
   success: boolean
   data?: {
-    status: 'pending' | 'completed'
+    status: 'pending' | 'completed' | 'failed'
     authenticated: boolean
+    message?: string
+    eresult?: number
   }
   error?: {
     message: string

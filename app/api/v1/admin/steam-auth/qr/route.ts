@@ -8,6 +8,50 @@ const AUTH_AFTER_MAX_MS = 240_000
 // Armazenar sessões temporariamente (em produção, considere usar Redis)
 const activeSessions = new Map<string, LoginSession>()
 
+/** Falhas recentes por sessionId (mesma instância que o POST) — ex.: EResult 9 após Recusar no app */
+const sessionFailures = new Map<
+  string,
+  { eresult?: number; message: string; at: number }
+>()
+const FAILURE_TTL_MS = 120_000
+
+function readEresult(err: unknown): number | undefined {
+  if (err && typeof err === 'object' && 'eresult' in err) {
+    const n = (err as { eresult: unknown }).eresult
+    return typeof n === 'number' ? n : undefined
+  }
+  return undefined
+}
+
+function describeSteamQrFailure(eresult: number | undefined, err: unknown): string {
+  // k_EResultFileNotFound — na doc do steam-session: login recusado no mobile OU sessão inválida/expirada
+  if (eresult === 9) {
+    return 'A Steam encerrou esta tentativa (código 9). Isso acontece se você tocou em Recusar no app, se o QR expirou ou se iniciou outro login. Use "Tentar novamente" e toque em Aprovar no Steam Mobile.'
+  }
+  const msg = err instanceof Error ? err.message : ''
+  return msg || 'Falha na autenticação Steam. Gere um novo QR e tente de novo.'
+}
+
+function rememberSessionFailure(
+  sessionId: string,
+  eresult: number | undefined,
+  err: unknown,
+) {
+  sessionFailures.set(sessionId, {
+    eresult,
+    message: describeSteamQrFailure(eresult, err),
+    at: Date.now(),
+  })
+}
+
+function takeSessionFailure(sessionId: string) {
+  const row = sessionFailures.get(sessionId)
+  if (!row) return null
+  sessionFailures.delete(sessionId)
+  if (Date.now() - row.at > FAILURE_TTL_MS) return null
+  return row
+}
+
 // POST - Iniciar processo de autenticação Steam
 export async function POST(req: Request): Promise<Response> {
   try {
@@ -72,7 +116,9 @@ export async function POST(req: Request): Promise<Response> {
     })
 
     session.on('error', (error) => {
+      const er = readEresult(error)
       console.error('Erro na autenticação Steam:', error)
+      rememberSessionFailure(sessionId, er, error)
       activeSessions.delete(sessionId)
       signalAuthWorkDone()
     })
@@ -131,6 +177,22 @@ export async function GET(req: Request): Promise<Response> {
           },
         }),
         { status: 400, headers: { 'Content-Type': 'application/json' } },
+      )
+    }
+
+    const failed = takeSessionFailure(sessionId)
+    if (failed) {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          data: {
+            status: 'failed',
+            authenticated: false,
+            message: failed.message,
+            eresult: failed.eresult,
+          },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
       )
     }
 

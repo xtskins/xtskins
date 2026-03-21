@@ -84,6 +84,19 @@ export function useSteamQRAuth() {
             return
           }
 
+          if (sessionResult.data?.status === 'failed') {
+            clearInterval(interval)
+            setPollingInterval(null)
+            setState((prev) => ({
+              ...prev,
+              status: 'error',
+              message:
+                sessionResult.data?.message ||
+                'Autenticação Steam não concluída. Tente de novo.',
+            }))
+            return
+          }
+
           // Polling 2: Verificar se refresh token existe no sistema (backup)
           try {
             const authCheckResult = await steamApi.checkSteamAuth()
